@@ -60,17 +60,17 @@ const initialFiles = [
 
 function StatusPill({ status }) {
   const map = {
-    ready: { label: "Ready", bg: "#EAF3DE", color: "#3B6D11", border: "#C0DD97", dot: "#5A9A1A" },
-    processing: { label: "Processing", bg: "#FAEEDA", color: "#854F0B", border: "#FAC775", dot: "#E07B0A" },
-    error: { label: "Error", bg: "#FCEBEB", color: "#A32D2D", border: "#F7C1C1", dot: "#CC3333" },
-    idle: { label: "Queued", bg: "#F0F0F0", color: "#555", border: "#CCC", dot: "#999" },
+    ready: { label: "Ready", bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", dot: "bg-emerald-600" },
+    processing: { label: "Processing", bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", dot: "bg-amber-600" },
+    error: { label: "Error", bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200", dot: "bg-rose-600" },
+    idle: { label: "Queued", bg: "bg-zinc-100", text: "text-zinc-600", border: "border-zinc-200", dot: "bg-zinc-500" },
   };
   const s = map[status] || map.idle;
   return (
-    <span style={{ background: s.bg, color: s.color, border: `0.5px solid ${s.border}`, borderRadius: 99, padding: "3px 10px", fontSize: 11, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 5 }}>
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${s.bg} ${s.text} ${s.border}`}>
       {status === "processing"
-        ? <span style={{ width: 8, height: 8, borderRadius: "50%", border: `2px solid ${s.border}`, borderTopColor: s.dot, display: "inline-block", animation: "spin 0.8s linear infinite" }} />
-        : <span style={{ width: 7, height: 7, borderRadius: "50%", background: s.dot, display: "inline-block" }} />}
+        ? <span className={`inline-block h-2 w-2 rounded-full border-2 ${s.border}`} style={{ borderTopColor: s.dot.replace("bg-", "") }} />
+        : <span className={`inline-block h-1.5 w-1.5 rounded-full ${s.dot}`} />}
       {s.label}
     </span>
   );
@@ -78,76 +78,64 @@ function StatusPill({ status }) {
 
 function FileRow({ file, expanded, onToggle, onDownload, onCopy, onPublish }) {
   return (
-    <div style={{ borderBottom: "0.5px solid #e5e5e5" }}>
+    <div className="border-b border-zinc-200">
       <div
         onClick={() => file.status !== "idle" && onToggle()}
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 110px 80px 90px 28px",
-          alignItems: "center",
-          gap: 8,
-          padding: "10px 20px",
-          cursor: file.status !== "idle" ? "pointer" : "default",
-          background: expanded ? "#fafafa" : "white",
-          transition: "background 0.1s",
-        }}
+        className={`grid grid-cols-[1fr_110px_80px_90px_28px] items-center gap-2 px-5 py-2.5 ${expanded ? "bg-zinc-50" : "bg-white"} ${file.status !== "idle" ? "cursor-pointer" : "cursor-default"}`}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: 7, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
-            background: file.status === "error" ? "#FCEBEB" : file.status === "idle" ? "#f0f0f0" : "#F5E6E6",
-          }}>
+        <div className="flex min-w-0 items-center gap-2.5">
+          <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${file.status === "error" ? "bg-rose-50" : file.status === "idle" ? "bg-zinc-100" : "bg-rose-100"}`}>
             <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke={file.status === "error" ? "#A32D2D" : file.status === "idle" ? "#999" : SCARLET} strokeWidth={1.8}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           </div>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{file.name}</div>
-            <div style={{ fontSize: 11, color: "#888", marginTop: 1 }}>{file.pages ? `${file.pages} pages` : "Could not read"}</div>
+          <div className="min-w-0">
+            <div className="truncate text-sm font-medium text-zinc-800">{file.name}</div>
+            <div className="mt-1 text-[11px] text-zinc-500">{file.pages ? `${file.pages} pages` : "Could not read"}</div>
           </div>
         </div>
         <div><StatusPill status={file.status} /></div>
-        <div style={{ fontSize: 12, color: "#777" }}>{file.size}</div>
-        <div style={{ fontSize: 12, color: "#777" }}>{file.added}</div>
-        <div style={{ color: "#aaa", fontSize: 14, transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.2s", visibility: file.status === "idle" ? "hidden" : "visible" }}>
+        <div className="text-xs text-zinc-600">{file.size}</div>
+        <div className="text-xs text-zinc-600">{file.added}</div>
+        <div className={`text-lg text-zinc-400 transition-transform ${expanded ? "rotate-180" : ""} ${file.status === "idle" ? "invisible" : "visible"}`}>
           ▾
         </div>
       </div>
 
       {expanded && file.status === "ready" && (
-        <div style={{ borderTop: "0.5px solid #eee", padding: "14px 20px 18px", background: "#fafafa" }}>
-          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-            <button onClick={onDownload} style={{ background: SCARLET, color: "#fff", border: "none", borderRadius: 6, padding: "6px 14px", fontSize: 12, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+        <div className="border-t border-zinc-200 bg-zinc-50 px-5 py-4">
+          <div className="mb-3 flex gap-2">
+            <button onClick={onDownload} className="inline-flex items-center gap-1.5 rounded-md bg-[#BB0000] px-3.5 py-2 text-[12px] font-medium text-white">
               ↓ Download HTML
             </button>
-            <button onClick={onCopy} style={{ background: "white", border: "0.5px solid #ccc", borderRadius: 6, padding: "6px 14px", fontSize: 12, cursor: "pointer" }}>
+            <button onClick={onCopy} className="rounded-md border border-zinc-300 bg-white px-3.5 py-2 text-[12px] text-zinc-700">
               Copy HTML
             </button>
-            <button onClick={onPublish} style={{ background: "white", border: "0.5px solid #ccc", borderRadius: 6, padding: "6px 14px", fontSize: 12, cursor: "pointer" }}>
+            <button onClick={onPublish} className="rounded-md border border-zinc-300 bg-white px-3.5 py-2 text-[12px] text-zinc-700">
               Publish to Canvas
             </button>
           </div>
-          <div style={{ fontSize: 11, color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Output preview</div>
-          <div style={{ background: "#f0f0f0", border: "0.5px solid #ddd", borderRadius: 7, padding: "12px 14px", fontFamily: "monospace", fontSize: 11, color: "#444", lineHeight: 1.7, maxHeight: 130, overflow: "hidden", position: "relative" }}>
-            <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>{file.html}</pre>
-            <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 36, background: "linear-gradient(transparent, #f0f0f0)", pointerEvents: "none" }} />
+          <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.05em] text-zinc-500">Output preview</div>
+          <div className="relative max-h-[130px] overflow-hidden rounded-lg border border-zinc-300 bg-zinc-100 p-3 font-mono text-[11px] leading-7 text-zinc-600">
+            <pre className="m-0 whitespace-pre-wrap">{file.html}</pre>
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-9 bg-gradient-to-t from-zinc-100 to-transparent" />
           </div>
         </div>
       )}
 
       {expanded && file.status === "error" && (
-        <div style={{ borderTop: "0.5px solid #eee", padding: "14px 20px 18px", background: "#fafafa" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div className="border-t border-zinc-200 bg-zinc-50 px-5 py-4">
+          <div className="flex flex-col gap-2">
             {file.warnings.map((w, i) => (
-              <div key={i} style={{ background: "#FCEBEB", border: "0.5px solid #F7C1C1", borderRadius: 7, padding: "10px 12px" }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: "#A32D2D" }}>{w.title}</div>
-                <div style={{ fontSize: 11, color: "#791F1F", marginTop: 3, lineHeight: 1.5 }}>{w.desc}</div>
+              <div key={i} className="rounded-lg border border-rose-200 bg-rose-50 p-2.5">
+                <div className="text-[12px] font-semibold text-rose-700">{w.title}</div>
+                <div className="mt-1 text-[11px] leading-5 text-rose-800">{w.desc}</div>
               </div>
             ))}
           </div>
-          <div style={{ marginTop: 12, fontSize: 12, color: "#777", display: "flex", alignItems: "center", gap: 8 }}>
+          <div className="mt-3 flex items-center gap-2 text-[12px] text-zinc-600">
             Partial output was generated.
-            <button style={{ background: "white", border: "0.5px solid #ccc", borderRadius: 6, padding: "4px 10px", fontSize: 11, cursor: "pointer" }}>Download anyway</button>
+            <button className="rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-[11px]">Download anyway</button>
           </div>
         </div>
       )}
@@ -223,39 +211,33 @@ export default function App({ sessionId }) {
   }, 0);
 
   return (
-    <div style={{ display: "flex", height: "100vh", fontFamily: "system-ui, sans-serif", fontSize: 13, color: "#1a1a1a", background: "#f5f5f5" }}>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } } button:focus { outline: 2px solid #BB0000; outline-offset: 2px; }`}</style>
+    <div className="flex h-screen bg-zinc-100 text-[13px] text-zinc-800">
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } } button:focus-visible { outline: 2px solid #BB0000; outline-offset: 2px; }`}</style>
 
       {/* Sidebar */}
-      <div style={{ width: 200, background: SCARLET, display: "flex", flexDirection: "column", flexShrink: 0 }}>
-        <div style={{ padding: "18px 16px 10px" }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "white", letterSpacing: "0.01em" }}>Sessions</div>
-          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", marginTop: 2 }}>Conversion history</div>
+      <div className="flex w-[200px] shrink-0 flex-col bg-[#BB0000] text-white">
+        <div className="px-4 py-4">
+          <div className="text-[13px] font-bold tracking-[0.01em]">Sessions</div>
+          <div className="mt-1 text-[11px] text-white/60">Conversion history</div>
         </div>
 
-        <div style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}>
+        <div className="flex-1 overflow-y-auto py-2">
           {sessions.map(s => (
             <div
               key={s.id}
               onClick={() => setActiveSession(s.id)}
-              style={{
-                padding: "9px 16px",
-                cursor: "pointer",
-                background: activeSession === s.id ? "rgba(255,255,255,0.18)" : "transparent",
-                borderLeft: activeSession === s.id ? "3px solid white" : "3px solid transparent",
-                transition: "background 0.1s",
-              }}
+              className={`cursor-pointer border-l-2 px-4 py-2.5 transition-colors ${activeSession === s.id ? "border-white bg-white/15" : "border-transparent bg-transparent"}`}
             >
-              <div style={{ fontSize: 13, fontWeight: 600, color: "white" }}>{s.name}</div>
-              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", marginTop: 2 }}>{s.count} files · {s.date}</div>
+              <div className="text-[13px] font-semibold">{s.name}</div>
+              <div className="mt-1 text-[11px] text-white/60">{s.count} files · {s.date}</div>
             </div>
           ))}
         </div>
 
-        <div style={{ padding: 12 }}>
+        <div className="p-3">
           <button
             onClick={handleNewSession}
-            style={{ width: "100%", background: "rgba(255,255,255,0.15)", border: "0.5px solid rgba(255,255,255,0.3)", color: "white", borderRadius: 7, padding: "8px 0", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+            className="w-full rounded-lg border border-white/30 bg-white/15 px-3 py-2 text-[12px] font-semibold text-white"
           >
             + New session
           </button>
@@ -263,24 +245,24 @@ export default function App({ sessionId }) {
       </div>
 
       {/* Main */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div className="flex flex-1 flex-col overflow-hidden">
 
         {/* Header */}
-        <div style={{ padding: "18px 24px 14px", background: "white", borderBottom: "0.5px solid #e5e5e5", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div className="flex items-center justify-between border-b border-zinc-200 bg-white px-6 py-4">
           <div>
-            <div style={{ fontSize: 18, fontWeight: 600 }}>Convert documents</div>
+            <div className="text-lg font-semibold text-zinc-900">Convert documents</div>
             {activeSessionUuid ? (
-              <div style={{ marginTop: 6, fontSize: 12, color: "#555" }}>
-                Session UUID: <span style={{ fontFamily: "monospace", color: SCARLET }}>{activeSessionUuid}</span>
+              <div className="mt-1.5 text-[12px] text-zinc-600">
+                Session UUID: <span className="font-mono text-[#BB0000]">{activeSessionUuid}</span>
               </div>
             ) : null}
           </div>
-          <span style={{ background: "#F5E6E6", color: SCARLET, border: `0.5px solid #E8B4B4`, borderRadius: 99, padding: "3px 10px", fontSize: 11, fontWeight: 600 }}>
+          <span className="rounded-full border border-[#E8B4B4] bg-[#F5E6E6] px-2.5 py-1 text-[11px] font-semibold text-[#BB0000]">
             {files.length} files queued
           </span>
         </div>
 
-        <div style={{ flex: 1, overflowY: "auto", padding: 24 }}>
+        <div className="flex-1 overflow-y-auto p-6">
 
           {/* Drop zone */}
           <div
@@ -288,18 +270,9 @@ export default function App({ sessionId }) {
             onDragLeave={() => setDragging(false)}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current.click()}
-            style={{
-              border: `1.5px dashed ${dragging ? SCARLET : "#ccc"}`,
-              borderRadius: 10,
-              padding: "22px 20px",
-              textAlign: "center",
-              cursor: "pointer",
-              background: dragging ? "#FFF5F5" : "#fafafa",
-              marginBottom: 20,
-              transition: "all 0.15s",
-            }}
+            className={`mb-5 cursor-pointer rounded-xl border-2 border-dashed p-5 text-center transition-colors ${dragging ? "border-[#BB0000] bg-[#FFF5F5]" : "border-zinc-300 bg-zinc-50"}`}
           >
-            <input ref={fileInputRef} type="file" accept=".docx" multiple style={{ display: "none" }} onChange={e => {
+            <input ref={fileInputRef} type="file" accept=".docx" multiple className="hidden" onChange={e => {
               const newFiles = Array.from(e.target.files).map((f, i) => ({
                 id: files.length + i, name: f.name, pages: null,
                 size: `${Math.round(f.size / 1024)} KB`, added: "Just now",
@@ -308,18 +281,18 @@ export default function App({ sessionId }) {
               setFiles(prev => [...prev, ...newFiles]);
               showToast(`${newFiles.length} file${newFiles.length > 1 ? "s" : ""} added`);
             }} />
-            <div style={{ fontSize: 13, color: "#666" }}>
+            <div className="text-[13px] text-zinc-600">
               Drop .docx files here, or{" "}
-              <span style={{ color: SCARLET, fontWeight: 600, textDecoration: "underline" }}>browse to upload</span>
+              <span className="font-semibold text-[#BB0000] underline">browse to upload</span>
             </div>
           </div>
 
           {/* File table */}
           {files.length > 0 && (
-            <div style={{ background: "white", border: "0.5px solid #e5e5e5", borderRadius: 10, overflow: "hidden" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 110px 80px 90px 28px", gap: 8, padding: "8px 20px", borderBottom: "0.5px solid #eee", background: "#fafafa" }}>
-                {["FILE", "STATUS", "SIZE", "ADDED", ""].map((h, i) => (
-                  <span key={i} style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</span>
+            <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+              <div className="grid grid-cols-[1fr_110px_80px_90px_28px] gap-2 border-b border-zinc-200 bg-zinc-50 px-5 py-2">
+                {['FILE', 'STATUS', 'SIZE', 'ADDED', ''].map((h, i) => (
+                  <span key={i} className="text-[10px] font-bold uppercase tracking-[0.06em] text-zinc-500">{h}</span>
                 ))}
               </div>
               {files.map(f => (
@@ -338,20 +311,14 @@ export default function App({ sessionId }) {
         </div>
 
         {/* Footer */}
-        <div style={{ padding: "12px 24px", background: "white", borderTop: "0.5px solid #e5e5e5", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ fontSize: 12, color: "#777" }}>
+        <div className="flex items-center justify-between border-t border-zinc-200 bg-white px-6 py-3">
+          <div className="text-[12px] text-zinc-600">
             {files.length} files · {totalSize} KB total
           </div>
           <button
             onClick={handleConvertAll}
             disabled={converting}
-            style={{
-              background: converting ? "#999" : SCARLET,
-              color: "white", border: "none", borderRadius: 7,
-              padding: "8px 22px", fontSize: 13, fontWeight: 600,
-              cursor: converting ? "not-allowed" : "pointer",
-              transition: "background 0.2s",
-            }}
+            className={`rounded-lg px-5 py-2 text-[13px] font-semibold text-white transition-colors ${converting ? "cursor-not-allowed bg-zinc-500" : "bg-[#BB0000]"}`}
           >
             {converting ? "Converting..." : "Convert all"}
           </button>
@@ -360,13 +327,7 @@ export default function App({ sessionId }) {
 
       {/* Toast */}
       {toast && (
-        <div style={{
-          position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
-          background: toast.color, color: "white", borderRadius: 8,
-          padding: "10px 20px", fontSize: 13, fontWeight: 500,
-          boxShadow: "0 4px 16px rgba(0,0,0,0.15)", zIndex: 999,
-          animation: "fadeIn 0.2s ease",
-        }}>
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-[#1f2937] px-5 py-3 text-[13px] font-medium text-white shadow-lg" style={{ animation: "fadeIn 0.2s ease" }}>
           {toast.msg}
         </div>
       )}
