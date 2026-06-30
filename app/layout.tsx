@@ -23,7 +23,8 @@ export default function RootLayout({
       className={cn("antialiased", fontMono.variable, "font-sans", inter.variable)}
     >
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        {/* Forced light theme to match Canvas. May change in the future. */}
+        <ThemeProvider forcedTheme="light">{children}</ThemeProvider>
       </body>
     </html>
   )
