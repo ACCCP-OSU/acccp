@@ -7,17 +7,22 @@
  * ─── API INTERACTION MAP ─────────────────────────────────────────────────────
  *
  *  1. AUTH (BuckeyePass SSO)
- *     Runs first — every request. Verifies the session token and extracts userId.
+ *     Runs first — every request. Verifies the session token and resolves the
+ *     userId by looking up (or creating) a row in the PostgreSQL `users` table.
  *     Unauthenticated requests are rejected here.
  *
- *  2. FILE STORAGE (S3 / MinIO)
- *     Runs after auth. Uploads the raw .docx buffer and returns an s3Key
- *     that gets attached to the job record.
+ *  2. FILE STORAGE (S3 / MinIO) + PostgreSQL `documents` + `artifacts`
+ *     Uploads the raw .docx buffer to S3/MinIO and gets back a storage key.
+ *     Then inserts a `documents` row (filename, size, checksum) and an
+ *     `artifacts` row (type: source_docx) pointing to that storage key.
  *
- *  3. JOB TRACKING (MongoDB)
- *     Runs twice — once before conversion (status: "processing") so the job
- *     appears in the admin board immediately, and once after (status: "completed"
- *     or "failed") to store the final HTML output.
+ *  3. JOB TRACKING (PostgreSQL `conversion_jobs`)
+ *     Runs twice:
+ *       Before conversion — insert a `conversion_jobs` row with status "processing"
+ *       so the job appears in the admin board immediately while it runs.
+ *       After conversion — update status to "completed" or "failed", insert an
+ *       `artifacts` row for the HTML output (type: html_output), and insert one
+ *       `validation_findings` row per AccessibilityError returned by Stage 2.
  *
  *  4. AI CONVERSION (LiteLLM via convertDocx)
  *     The core of this route. Runs after auth, storage, and job creation.
@@ -29,7 +34,7 @@
  * Request:  multipart/form-data  { file: <.docx binary> }
  * Response: application/json
  *   {
- *     jobId:               string
+ *     jobId:               string               — conversion_jobs.id (UUID)
  *     html:                string               — accessible Canvas HTML
  *     errors:              AccessibilityError[] — structured issues for the UI
  *     model:               string
@@ -52,7 +57,8 @@ const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024 // 20 MB
 export async function POST(req: NextRequest) {
 
   // ── INTERACTION POINT 1: AUTH ─────────────────────────────────────────────
-  // Verify BuckeyePass SSO session and extract userId. Reject with 401 if invalid.
+  // Verify BuckeyePass SSO session. Look up or create the user in the
+  // PostgreSQL `users` table and extract their UUID. Reject with 401 if invalid.
   const userId = "unauthenticated" // placeholder until auth is wired up
 
   // ── Parse multipart form ──────────────────────────────────────────────────
@@ -93,13 +99,16 @@ export async function POST(req: NextRequest) {
 
   const buffer = Buffer.from(await file.arrayBuffer())
 
-  // ── INTERACTION POINT 2: FILE STORAGE ────────────────────────────────────
-  // Upload the .docx buffer to S3/MinIO and receive an s3Key for the job record.
+  // ── INTERACTION POINT 2: FILE STORAGE + documents + artifacts ────────────
+  // Upload the .docx buffer to S3/MinIO and receive a storage key.
+  // Insert a `documents` row with file metadata (filename, size, checksum).
+  // Insert an `artifacts` row (artifact_type: source_docx) with the storage key.
   const s3Key = `pending/${Date.now()}_${filename}` // placeholder until storage is wired up
 
-  // ── INTERACTION POINT 3a: JOB TRACKING — create job ──────────────────────
-  // Create a MongoDB job record with status "processing" before conversion starts.
-  const jobId = `job_${Date.now()}` // placeholder until job tracking is wired up
+  // ── INTERACTION POINT 3a: JOB TRACKING — create conversion_jobs row ───────
+  // Insert a `conversion_jobs` row linked to the document, with status "processing".
+  // This makes the job visible in the admin board before conversion completes.
+  const jobId = `job_${Date.now()}` // placeholder — will be a UUID from PostgreSQL
 
   console.log(`[api/convert] job=${jobId} user=${userId} file=${filename}`)
 
@@ -108,8 +117,10 @@ export async function POST(req: NextRequest) {
   // Stage 2 validates it and returns structured AccessibilityError[].
   const result = await convertDocx(buffer, filename)
 
-  // ── INTERACTION POINT 3b: JOB TRACKING — update job ─────────────────────
-  // Update the job record with the final status and store the HTML output.
+  // ── INTERACTION POINT 3b: JOB TRACKING — update conversion_jobs row ───────
+  // Update conversion_jobs status to "completed" or "failed".
+  // On success: insert an artifacts row (artifact_type: html_output) with the HTML
+  // storage key, and insert one validation_findings row per AccessibilityError.
 
   if ("error" in result) {
     console.error(`[api/convert] job=${jobId} failed: ${result.error}`)
