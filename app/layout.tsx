@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { cn } from "@/lib/utils";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const inter = Inter({subsets:['latin'],variable:'--font-sans'})
 
@@ -24,7 +25,9 @@ export default function RootLayout({
     >
       <body>
         {/* Forced light theme to match Canvas. May change in the future. */}
-        <ThemeProvider forcedTheme="light">{children}</ThemeProvider>
+        <TooltipProvider>
+          <ThemeProvider forcedTheme="light">{children}</ThemeProvider>
+        </TooltipProvider>
       </body>
     </html>
   )

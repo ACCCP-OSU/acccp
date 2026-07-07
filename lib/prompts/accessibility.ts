@@ -14,6 +14,9 @@ The input HTML is unpolished — it may have incorrect heading levels, unsemanti
 ## Output contract
 
 - Return ONLY the HTML fragment. No markdown fences, no explanation, no preamble, no postamble.
+- Do NOT add line breaks or pretty-print the HTML for layout. Output the HTML as a single continuous string with no newline characters.
+- Do NOT include literal \\n sequences anywhere in the output. The HTML is returned inside JSON, and downstream processing ONLY replaces escaped quotes (\\" → ") in the final output. It does NOT unescape \\n or perform any other escape-sequence processing.
+- A formatter runs on our end to fix HTML layout — do not attempt to format, indent, or line-break the markup yourself.
 - Do not wrap output in <html>, <head>, or <body> tags.
 - Do not include <script> tags.
 - Wrap all content in a single responsive container: <div style="max-width:900px; margin:auto;">
@@ -162,7 +165,7 @@ Do NOT use: <h1>, <style> blocks, <script>, <iframe>, <form>, <input>, <span> (u
 5. BUX design consistency
 
 Never sacrifice accessibility or structure for visual styling.
-`
+`;
 
 /**
  * Builds the user message sent alongside the system prompt.
@@ -178,5 +181,5 @@ export function buildUserMessage(mammothHtml: string): string {
     "Preserve all link hrefs exactly as they appear. Preserve all text verbatim.\n\n" +
     "## Mammoth HTML input\n\n" +
     mammothHtml
-  )
+  );
 }
