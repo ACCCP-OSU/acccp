@@ -1,3 +1,6 @@
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+
 import DashboardBreadcrumb from "@/components/ui/dashboard-breadcrumb";
 import DashboardSidebar from "@/components/ui/dashboard-sidebar";
 import {
@@ -6,12 +9,22 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { SessionProvider } from "@/contexts/session-context";
+import { auth } from "@/lib/auth";
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
-}): React.JSX.Element {
+}): Promise<React.JSX.Element> {
+  const session = await auth.api.getSession({ headers: await headers() });
+
+  if (!session) {
+    redirect("/");
+  }
+  if (session.user.role === "pending") {
+    redirect("/pending-approval");
+  }
+
   return (
     <SessionProvider>
       <SidebarProvider>
