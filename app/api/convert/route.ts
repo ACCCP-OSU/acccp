@@ -51,15 +51,18 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { convertDocx } from "@/lib/convert"
+import { verifyRoleOrUnauthorized } from "@/lib/auth"
 
 const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024 // 20 MB
 
 export async function POST(req: NextRequest) {
 
   // ── INTERACTION POINT 1: AUTH ─────────────────────────────────────────────
-  // Verify BuckeyePass SSO session. Look up or create the user in the
-  // PostgreSQL `users` table and extract their UUID. Reject with 401 if invalid.
-  const userId = "unauthenticated" // placeholder until auth is wired up
+  // Verify the better-auth session and resolve the userId from the
+  // PostgreSQL `users` table. Reject with 401 if unauthenticated or pending.
+  const authCheck = await verifyRoleOrUnauthorized(["instructor", "admin"])
+  if ("response" in authCheck) return authCheck.response
+  const userId = authCheck.session.user.id
 
   // ── Parse multipart form ──────────────────────────────────────────────────
   let formData: FormData

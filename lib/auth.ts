@@ -5,6 +5,9 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "./db";
 import { users, authSessions, accounts, verifications } from "./db/schema";
 import { sendOtpEmail } from "./email";
+import { redirect } from "next/navigation";
+import { headers } from "next/headers";
+import { NextResponse } from "next/server";
 
 // Ohio State issues every account an @osu.edu address (or a subdomain, e.g.
 // buckeyemail.osu.edu); gating on this is what keeps sign-in scoped to OSU
@@ -70,3 +73,47 @@ export const auth = betterAuth({
     modelName: "authSessions",
   },
 });
+
+export type Role = "pending" | "instructor" | "admin";
+
+/**
+ * Verifies role on the current user session.
+ * Redirects to "/unauthorized" on 401.
+ * Redirects to "/" if no session.
+ * @param permitted - Roles with permission.
+ */
+export async function verifyRoleOrRedirect(permitted: Role[]) {
+  const session = await auth.api.getSession({ headers: await headers() });
+
+  // Not logged in
+  if (!session) {
+    redirect("/");
+  }
+
+  // Doesn't have the proper role
+  if (!permitted.includes(session.user.role as Role)) {
+    redirect("/unauthorized");
+  }
+}
+
+type Session = NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>;
+
+/**
+ * Verifies role on the current user session for use in API route handlers.
+ * Returns the session on success, or a 401 NextResponse to return immediately
+ * if the caller is unauthenticated or lacks a permitted role.
+ * @param permitted - Roles with permission.
+ */
+export async function verifyRoleOrUnauthorized(
+  permitted: Role[]
+): Promise<{ session: Session } | { response: NextResponse }> {
+  const session = await auth.api.getSession({ headers: await headers() });
+
+  if (!session || !permitted.includes(session.user.role as Role)) {
+    return {
+      response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    };
+  }
+
+  return { session };
+}
