@@ -16,7 +16,8 @@ export interface UploadedDocument {
   errorMessage?: string;
 }
 
+/** Mirrors the columns of `sessions` that the dashboard UI needs. */
 export interface Session {
-  id: number;
-  name: string;
+  id: string;
+  title: string;
 }

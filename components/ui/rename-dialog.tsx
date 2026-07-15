@@ -14,13 +14,14 @@ import {
 import { Field, FieldGroup } from "./field";
 import { Input } from "./input";
 import { Label } from "./label";
+import type { ActionResult } from "@/lib/actions/sessions";
 import type { Session } from "@/lib/types/document";
 
 interface RenameDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   session: Session;
-  onRename: (name: string) => void;
+  onRename: (title: string) => Promise<ActionResult>;
 }
 
 export default function RenameDialog({
@@ -29,20 +30,32 @@ export default function RenameDialog({
   session,
   onRename,
 }: RenameDialogProps): React.JSX.Element {
-  const [name, setName] = useState(session.name);
+  const [title, setTitle] = useState(session.title);
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setName(session.name);
+      setTitle(session.title);
+      setError(null);
     }
-  }, [open, session.name]);
+  }, [open, session.title]);
 
-  const handleRename = (): void => {
-    const trimmedName = name.trim();
-    if (!trimmedName) {
+  const handleRename = async (): Promise<void> => {
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
       return;
     }
-    onRename(trimmedName);
+
+    setIsSaving(true);
+    const result = await onRename(trimmedTitle);
+    setIsSaving(false);
+
+    // Titles are unique per user, so stay open and let them pick another.
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
     onOpenChange(false);
   };
 
@@ -57,26 +70,42 @@ export default function RenameDialog({
         </DialogHeader>
         <FieldGroup>
           <Field>
-            <Label htmlFor={`session-name-${session.id}`}>Session name</Label>
+            <Label htmlFor={`session-title-${session.id}`}>Session name</Label>
             <Input
-              id={`session-name-${session.id}`}
+              id={`session-title-${session.id}`}
               type="text"
               placeholder="Session name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
+              value={title}
+              onChange={(event) => {
+                setTitle(event.target.value);
+                setError(null);
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   event.preventDefault();
-                  handleRename();
+                  void handleRename();
                 }
               }}
+              aria-invalid={error !== null}
+              aria-describedby={error ? `session-title-error-${session.id}` : undefined}
               autoFocus
             />
+            {error && (
+              <p
+                id={`session-title-error-${session.id}`}
+                role="alert"
+                className="text-destructive text-sm"
+              >
+                {error}
+              </p>
+            )}
           </Field>
         </FieldGroup>
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
-          <Button onClick={handleRename}>Rename</Button>
+          <Button onClick={() => void handleRename()} disabled={isSaving}>
+            {isSaving ? "Renaming..." : "Rename"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

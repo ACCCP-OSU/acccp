@@ -9,31 +9,29 @@ import {
   type ReactNode,
 } from "react";
 import { useParams, useRouter } from "next/navigation";
+import {
+  archiveSession,
+  createSession,
+  renameSession as renameSessionAction,
+  type ActionResult,
+} from "@/lib/actions/sessions";
 import type { Session, UploadedDocument } from "@/lib/types/document";
 
 interface SessionContextValue {
   sessions: Session[];
   currentSession: Session;
   documents: UploadedDocument[];
-  addSession: () => void;
+  addSession: () => Promise<void>;
   selectSession: (session: Session) => void;
-  renameSession: (sessionId: number, name: string) => void;
-  deleteSession: (sessionId: number) => void;
+  renameSession: (sessionId: string, title: string) => Promise<ActionResult>;
+  deleteSession: (sessionId: string) => Promise<void>;
   addDocuments: (files: File[]) => void;
   toggleDocumentLock: (docId: string) => void;
   removeDocument: (docId: string) => void;
-  updateDocument: (
-    docId: string,
-    patch: Partial<UploadedDocument>,
-  ) => void;
+  updateDocument: (docId: string, patch: Partial<UploadedDocument>) => void;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
-
-const INITIAL_SESSIONS: Session[] = [
-  { id: 1, name: "Session 1" },
-  { id: 2, name: "Session 2" },
-];
 
 function filesToDocuments(files: File[]): UploadedDocument[] {
   return files.map((file) => ({
@@ -46,30 +44,34 @@ function filesToDocuments(files: File[]): UploadedDocument[] {
   }));
 }
 
-function resolveSession(sessions: Session[], paramId: number): Session {
-  if (paramId && !Number.isNaN(paramId)) {
-    const found = sessions.find((s) => s.id === paramId);
-    if (found) return found;
-  }
-  return sessions[0];
+function resolveSession(sessions: Session[], paramId: string | undefined): Session {
+  return sessions.find((s) => s.id === paramId) ?? sessions[0];
 }
 
-export function SessionProvider({ children }: { children: ReactNode }) {
+/**
+ * `sessions` is server state owned by the dashboard layout. Every mutation here
+ * goes through an action that revalidates that layout, so the refreshed prop is
+ * the single source of truth — copying it into local state would only let the
+ * two drift.
+ */
+export function SessionProvider({
+  children,
+  sessions,
+}: {
+  children: ReactNode;
+  sessions: Session[];
+}) {
   const router = useRouter();
   const params = useParams<{ id?: string }>();
-  const paramId = Number(params.id);
 
-  const [sessions, setSessions] = useState<Session[]>(INITIAL_SESSIONS);
+  // Documents are still client-only; persisting them is the next piece of work.
   const [documentsBySessionId, setDocumentsBySessionId] = useState<
-    Record<number, UploadedDocument[]>
-  >({
-    1: [],
-    2: [],
-  });
+    Record<string, UploadedDocument[]>
+  >({});
 
   const currentSession = useMemo(
-    () => resolveSession(sessions, paramId),
-    [sessions, paramId],
+    () => resolveSession(sessions, params.id),
+    [sessions, params.id],
   );
 
   const documents = useMemo(
@@ -78,10 +80,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const updateDocumentsForSession = useCallback(
-    (
-      sessionId: number,
-      updater: (docs: UploadedDocument[]) => UploadedDocument[],
-    ) => {
+    (sessionId: string, updater: (docs: UploadedDocument[]) => UploadedDocument[]) => {
       setDocumentsBySessionId((prev) => ({
         ...prev,
         [sessionId]: updater(prev[sessionId] ?? []),
@@ -90,13 +89,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const addSession = useCallback(() => {
-    setSessions((prev) => {
-      const newId = Math.max(0, ...prev.map((s) => s.id)) + 1;
-      setDocumentsBySessionId((docs) => ({ ...docs, [newId]: [] }));
-      router.push(`/dashboard/${newId}`);
-      return [...prev, { id: newId, name: `Session ${newId}` }];
-    });
+  const addSession = useCallback(async () => {
+    const result = await createSession();
+    if (!result.ok) return;
+
+    router.push(`/dashboard/${result.data.id}`);
   }, [router]);
 
   const selectSession = useCallback(
@@ -106,32 +103,31 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [router],
   );
 
-  const renameSession = useCallback((sessionId: number, name: string) => {
-    setSessions((prev) =>
-      prev.map((s) => (s.id === sessionId ? { ...s, name } : s)),
-    );
-  }, []);
+  const renameSession = useCallback(
+    (sessionId: string, title: string): Promise<ActionResult> =>
+      renameSessionAction(sessionId, title),
+    [],
+  );
 
   const deleteSession = useCallback(
-    (sessionId: number) => {
-      setSessions((prev) => {
-        const next = prev.filter((s) => s.id !== sessionId);
-        if (next.length === 0) return prev;
+    async (sessionId: string) => {
+      const result = await archiveSession(sessionId);
+      if (!result.ok) return;
 
-        setDocumentsBySessionId((docs) => {
-          const nextDocs = { ...docs };
-          delete nextDocs[sessionId];
-          return nextDocs;
-        });
-
-        if (currentSession.id === sessionId) {
-          router.push(`/dashboard/${next[0].id}`);
-        }
-
-        return next;
+      setDocumentsBySessionId((docs) => {
+        const nextDocs = { ...docs };
+        delete nextDocs[sessionId];
+        return nextDocs;
       });
+
+      // The archived session is gone from the refreshed list, so the [id] route
+      // would fall back to an arbitrary session; pick the neighbour explicitly.
+      if (currentSession.id === sessionId) {
+        const next = sessions.find((s) => s.id !== sessionId);
+        if (next) router.push(`/dashboard/${next.id}`);
+      }
     },
-    [currentSession.id, router],
+    [sessions, currentSession.id, router],
   );
 
   const addDocuments = useCallback(

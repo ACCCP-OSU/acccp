@@ -8,6 +8,7 @@ import {
   useSidebar,
 } from "./sidebar";
 import { MoreVertical } from "lucide-react";
+import type { ActionResult } from "@/lib/actions/sessions";
 import type { Session } from "@/lib/types/document";
 import {
   DropdownMenu,
@@ -21,8 +22,8 @@ interface SessionButtonProps {
   session: Session;
   currentSession: Session;
   setCurrentSession: (session: Session) => void;
-  onRenameSession: (sessionId: number, name: string) => void;
-  onDeleteSession: (sessionId: number) => void;
+  onRenameSession: (sessionId: string, title: string) => Promise<ActionResult>;
+  onDeleteSession: (sessionId: string) => void;
   canDelete: boolean;
 }
 
@@ -43,7 +44,7 @@ export default function SessionButton({
         isActive={currentSession.id === session.id}
         onClick={() => setCurrentSession(session)}
       >
-        <span>{session.name}</span>
+        <span>{session.title}</span>
       </SidebarMenuButton>
       <DropdownMenu>
         <DropdownMenuTrigger render={<SidebarMenuAction showOnHover />}>
@@ -70,7 +71,7 @@ export default function SessionButton({
         open={renameOpen}
         onOpenChange={setRenameOpen}
         session={session}
-        onRename={(name) => onRenameSession(session.id, name)}
+        onRename={(title) => onRenameSession(session.id, title)}
       />
     </SidebarMenuItem>
   );

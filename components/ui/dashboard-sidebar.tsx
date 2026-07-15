@@ -38,7 +38,7 @@ export default function DashboardSidebar(): React.JSX.Element {
           </SidebarGroupLabel>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton onClick={addSession}>
+              <SidebarMenuButton onClick={() => void addSession()}>
                 <LucideSquarePlus />
                 <span>New Session</span>
               </SidebarMenuButton>

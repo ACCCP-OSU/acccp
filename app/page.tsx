@@ -87,7 +87,7 @@ export default function HomePage(): React.JSX.Element {
       );
       return;
     }
-    router.push("/dashboard/1");
+    router.push("/dashboard");
     router.refresh();
   }
 

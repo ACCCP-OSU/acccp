@@ -20,7 +20,7 @@ export default function DashboardBreadcrumb(): React.JSX.Element {
           <BreadcrumbLink
             render={
               <Link href={`/dashboard/${currentSession.id}`}>
-                {currentSession.name}
+                {currentSession.title}
               </Link>
             }
           />

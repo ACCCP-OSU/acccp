@@ -76,13 +76,16 @@ export const auth = betterAuth({
 
 export type Role = "pending" | "instructor" | "admin";
 
+type Session = NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>;
+
 /**
  * Verifies role on the current user session.
  * Redirects to "/unauthorized" on 401.
  * Redirects to "/" if no session.
  * @param permitted - Roles with permission.
+ * @returns The verified session, so callers can read session.user.id.
  */
-export async function verifyRoleOrRedirect(permitted: Role[]) {
+export async function verifyRoleOrRedirect(permitted: Role[]): Promise<Session> {
   const session = await auth.api.getSession({ headers: await headers() });
 
   // Not logged in
@@ -94,9 +97,9 @@ export async function verifyRoleOrRedirect(permitted: Role[]) {
   if (!permitted.includes(session.user.role as Role)) {
     redirect("/unauthorized");
   }
-}
 
-type Session = NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>;
+  return session;
+}
 
 /**
  * Verifies role on the current user session for use in API route handlers.

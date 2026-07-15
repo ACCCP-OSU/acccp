@@ -9,6 +9,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { SessionProvider } from "@/contexts/session-context";
+import { listSessionsEnsuringDefault } from "@/lib/actions/sessions";
 import { auth } from "@/lib/auth";
 
 export default async function DashboardLayout({
@@ -21,12 +22,15 @@ export default async function DashboardLayout({
   if (!session) {
     redirect("/");
   }
+  // Must precede the session fetch, which sends a pending user to /unauthorized.
   if (session.user.role === "pending") {
     redirect("/pending-approval");
   }
 
+  const sessions = await listSessionsEnsuringDefault();
+
   return (
-    <SessionProvider>
+    <SessionProvider sessions={sessions}>
       <SidebarProvider>
         <DashboardSidebar />
         <SidebarInset>
