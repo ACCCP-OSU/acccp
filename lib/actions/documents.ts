@@ -1,0 +1,146 @@
+"use server";
+
+import { and, desc, eq, isNull } from "drizzle-orm";
+
+import { verifyRoleOrRedirect } from "@/lib/auth";
+import { db } from "@/lib/db";
+import {
+  artifacts,
+  conversionJobs,
+  documents,
+  sessions,
+} from "@/lib/db/schema";
+import {
+  downloadObject,
+  htmlOutputKey,
+  removeObjects,
+  sourceDocxKey,
+} from "@/lib/storage";
+import type { ConversionStatus, UploadedDocument } from "@/lib/types/document";
+
+// RLS is enabled but has no policies, so ownership is enforced here: every
+// query joins `sessions` and constrains owner_user_id.
+async function requireUserId(): Promise<string> {
+  const session = await verifyRoleOrRedirect(["instructor", "admin"]);
+  return session.user.id;
+}
+
+/**
+ * job_status carries states the dashboard has no concept of. `needs_review`
+ * still has usable HTML, so it reads as success; the terminal states that
+ * leave nothing to show read as errors.
+ */
+function toConversionStatus(status: string | null): ConversionStatus {
+  switch (status) {
+    case "queued":
+      return "queued";
+    case "processing":
+      return "processing";
+    case "completed":
+    case "needs_review":
+      return "success";
+    case "failed":
+    case "expired":
+    case "cancelled":
+      return "error";
+    default:
+      // No job row yet: uploaded but never converted.
+      return "idle";
+  }
+}
+
+export async function listDocuments(sessionId: string): Promise<UploadedDocument[]> {
+  const userId = await requireUserId();
+
+  const rows = await db
+    .select({
+      id: documents.id,
+      name: documents.originalFilename,
+      size: documents.fileSizeBytes,
+      uploadedAt: documents.createdAt,
+      status: conversionJobs.status,
+      errorMessage: conversionJobs.errorMessage,
+    })
+    .from(documents)
+    .innerJoin(sessions, eq(sessions.id, documents.sessionId))
+    .leftJoin(conversionJobs, eq(conversionJobs.documentId, documents.id))
+    .where(
+      and(
+        eq(documents.sessionId, sessionId),
+        eq(sessions.ownerUserId, userId),
+        isNull(documents.deletedAt),
+      ),
+    )
+    .orderBy(desc(documents.createdAt));
+
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    size: row.size,
+    uploadedAt: new Date(row.uploadedAt),
+    status: toConversionStatus(row.status),
+    // `documents` has no locked column, so the lock resets on reload.
+    locked: false,
+    errorMessage: row.errorMessage ?? undefined,
+  }));
+}
+
+/**
+ * The HTML lives in storage rather than a column, so it is fetched on demand
+ * instead of being loaded for every row of the documents table.
+ */
+export async function getDocumentHtml(documentId: string): Promise<string | null> {
+  const userId = await requireUserId();
+
+  const [row] = await db
+    .select({ storageKey: artifacts.storageKey })
+    .from(artifacts)
+    .innerJoin(conversionJobs, eq(conversionJobs.id, artifacts.jobId))
+    .innerJoin(documents, eq(documents.id, conversionJobs.documentId))
+    .innerJoin(sessions, eq(sessions.id, documents.sessionId))
+    .where(
+      and(
+        eq(documents.id, documentId),
+        eq(sessions.ownerUserId, userId),
+        eq(artifacts.artifactType, "html_output"),
+        eq(artifacts.artifactStatus, "available"),
+        isNull(documents.deletedAt),
+      ),
+    );
+
+  if (!row) return null;
+  return (await downloadObject(row.storageKey)).toString("utf8");
+}
+
+export async function deleteDocument(documentId: string): Promise<void> {
+  const userId = await requireUserId();
+
+  const [doc] = await db
+    .select({ id: documents.id, sessionId: documents.sessionId })
+    .from(documents)
+    .innerJoin(sessions, eq(sessions.id, documents.sessionId))
+    .where(
+      and(
+        eq(documents.id, documentId),
+        eq(sessions.ownerUserId, userId),
+        isNull(documents.deletedAt),
+      ),
+    );
+  if (!doc) return;
+
+  await db
+    .update(documents)
+    .set({ deletedAt: new Date().toISOString() })
+    .where(eq(documents.id, documentId));
+
+  // Best-effort: the row is already tombstoned, so a storage hiccup here should
+  // not surface as a failed delete.
+  try {
+    await removeObjects([
+      sourceDocxKey(doc.sessionId, documentId),
+      htmlOutputKey(doc.sessionId, documentId),
+    ]);
+  } catch (error) {
+    console.error(`[documents] blob cleanup failed for ${documentId}`, error);
+  }
+}

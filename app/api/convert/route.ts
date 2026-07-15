@@ -1,40 +1,19 @@
 /**
  * POST /api/convert
  *
- * Accepts a .docx file and returns accessible Canvas HTML plus a structured
- * list of accessibility errors.
+ * Converts a .docx into accessible Canvas HTML and persists the document, the
+ * conversion job, its artifacts, and its accessibility findings.
  *
- * ─── API INTERACTION MAP ─────────────────────────────────────────────────────
+ * Request:  multipart/form-data
+ *   sessionId   string  — the session to file the document under (required)
+ *   file        File    — the .docx (required unless documentId is given)
+ *   documentId  string  — re-convert an existing document; its .docx is read
+ *                         back from storage and no new document row is created
  *
- *  1. AUTH (BuckeyePass SSO)
- *     Runs first — every request. Verifies the session token and resolves the
- *     userId by looking up (or creating) a row in the PostgreSQL `users` table.
- *     Unauthenticated requests are rejected here.
- *
- *  2. FILE STORAGE (S3 / MinIO) + PostgreSQL `documents` + `artifacts`
- *     Uploads the raw .docx buffer to S3/MinIO and gets back a storage key.
- *     Then inserts a `documents` row (filename, size, checksum) and an
- *     `artifacts` row (type: source_docx) pointing to that storage key.
- *
- *  3. JOB TRACKING (PostgreSQL `conversion_jobs`)
- *     Runs twice:
- *       Before conversion — insert a `conversion_jobs` row with status "processing"
- *       so the job appears in the admin board immediately while it runs.
- *       After conversion — update status to "completed" or "failed", insert an
- *       `artifacts` row for the HTML output (type: html_output), and insert one
- *       `validation_findings` row per AccessibilityError returned by Stage 2.
- *
- *  4. AI CONVERSION (LiteLLM via convertDocx)
- *     The core of this route. Runs after auth, storage, and job creation.
- *     Two-stage pipeline: mammoth extracts HTML → Stage 1 AI converts it →
- *     Stage 2 AI validates and returns AccessibilityError[].
- *
- * ─────────────────────────────────────────────────────────────────────────────
- *
- * Request:  multipart/form-data  { file: <.docx binary> }
  * Response: application/json
  *   {
- *     jobId:               string               — conversion_jobs.id (UUID)
+ *     jobId:               string               — conversion_jobs.id (uuid)
+ *     documentId:          string               — documents.id (uuid)
  *     html:                string               — accessible Canvas HTML
  *     errors:              AccessibilityError[] — structured issues for the UI
  *     model:               string
@@ -42,107 +21,315 @@
  *     extractionWarnings:  string[]
  *   }
  *
- * Frontend usage:
- *   const form = new FormData()
- *   form.append("file", docxFile)
- *   const res = await fetch("/api/convert", { method: "POST", body: form })
- *   const data = await res.json()
+ * RLS is enabled on every table here but no policies exist, so the database
+ * will not filter by owner. Ownership is established once, up front, by
+ * confirming the caller owns the target session, and everything else hangs off
+ * that session.
  */
 
-import { NextRequest, NextResponse } from "next/server"
-import { convertDocx } from "@/lib/convert"
-import { verifyRoleOrUnauthorized } from "@/lib/auth"
+import { createHash } from "node:crypto";
+import { NextRequest, NextResponse } from "next/server";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
-const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024 // 20 MB
+import { verifyRoleOrUnauthorized } from "@/lib/auth";
+import { convertDocx, type AccessibilityError } from "@/lib/convert";
+import { db } from "@/lib/db";
+import {
+  artifacts,
+  conversionJobs,
+  documents,
+  jobEvents,
+  sessions,
+  validationFindings,
+} from "@/lib/db/schema";
+import {
+  DOCX_MIME_TYPE,
+  downloadObject,
+  htmlOutputKey,
+  sourceDocxKey,
+  uploadObject,
+} from "@/lib/storage";
+
+const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20 MB
+const PROVIDER = "litellm";
+
+/** validation_findings.title is NOT NULL, but the pipeline only emits a type slug. */
+const FINDING_TITLES: Record<AccessibilityError["type"], string> = {
+  "missing-alt": "Missing alt text",
+  "heading-skip": "Heading level skipped",
+  "bad-link": "Broken or invalid link",
+  "no-table-caption": "Table missing a caption",
+  "no-table-headers": "Table missing header cells",
+  "missing-list-markup": "List not marked up as a list",
+  "empty-heading": "Empty heading",
+  "color-only-meaning": "Meaning conveyed by colour alone",
+  "h1-present": "H1 used inside page content",
+  "non-descriptive-link": "Non-descriptive link text",
+  other: "Accessibility issue",
+};
+
+function json(body: unknown, status: number) {
+  return NextResponse.json(body, { status });
+}
 
 export async function POST(req: NextRequest) {
+  const authCheck = await verifyRoleOrUnauthorized(["instructor", "admin"]);
+  if ("response" in authCheck) return authCheck.response;
+  const userId = authCheck.session.user.id;
 
-  // ── INTERACTION POINT 1: AUTH ─────────────────────────────────────────────
-  // Verify the better-auth session and resolve the userId from the
-  // PostgreSQL `users` table. Reject with 401 if unauthenticated or pending.
-  const authCheck = await verifyRoleOrUnauthorized(["instructor", "admin"])
-  if ("response" in authCheck) return authCheck.response
-  const userId = authCheck.session.user.id
-
-  // ── Parse multipart form ──────────────────────────────────────────────────
-  let formData: FormData
+  let formData: FormData;
   try {
-    formData = await req.formData()
+    formData = await req.formData();
   } catch {
-    return NextResponse.json(
-      { error: "Invalid request. Expected multipart/form-data." },
-      { status: 400 }
-    )
+    return json({ error: "Invalid request. Expected multipart/form-data." }, 400);
   }
 
-  const file = formData.get("file")
-
-  if (!file || !(file instanceof File)) {
-    return NextResponse.json(
-      { error: "No file provided. Include a .docx file as the 'file' field." },
-      { status: 400 }
-    )
+  const sessionId = formData.get("sessionId");
+  if (typeof sessionId !== "string" || !sessionId) {
+    return json({ error: "No sessionId provided." }, 400);
   }
 
-  const filename = file.name
+  // Establishes ownership for every write below.
+  const [session] = await db
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(
+      and(
+        eq(sessions.id, sessionId),
+        eq(sessions.ownerUserId, userId),
+        isNull(sessions.archivedAt),
+      ),
+    );
+  if (!session) return json({ error: "Session not found." }, 404);
 
-  if (!filename.toLowerCase().endsWith(".docx")) {
-    return NextResponse.json(
-      { error: "Invalid file type. Only .docx files are supported." },
-      { status: 415 }
-    )
+  const existingDocumentId = formData.get("documentId");
+  const isReconversion = typeof existingDocumentId === "string" && existingDocumentId;
+
+  let documentId: string;
+  let filename: string;
+  let buffer: Buffer;
+
+  if (isReconversion) {
+    // Scoped to the session we just proved the caller owns.
+    const [existing] = await db
+      .select({ id: documents.id, originalFilename: documents.originalFilename })
+      .from(documents)
+      .where(
+        and(
+          eq(documents.id, existingDocumentId),
+          eq(documents.sessionId, sessionId),
+          isNull(documents.deletedAt),
+        ),
+      );
+    if (!existing) return json({ error: "Document not found." }, 404);
+
+    documentId = existing.id;
+    filename = existing.originalFilename;
+    try {
+      buffer = await downloadObject(sourceDocxKey(sessionId, documentId));
+    } catch (error) {
+      console.error(`[api/convert] document=${documentId} source fetch failed`, error);
+      return json({ error: "Could not read the stored document." }, 500);
+    }
+  } else {
+    const file = formData.get("file");
+    if (!file || !(file instanceof File)) {
+      return json(
+        { error: "No file provided. Include a .docx file as the 'file' field." },
+        400,
+      );
+    }
+    if (!file.name.toLowerCase().endsWith(".docx")) {
+      return json({ error: "Invalid file type. Only .docx files are supported." }, 415);
+    }
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      return json(
+        { error: `File too large. Maximum size is ${MAX_FILE_SIZE_BYTES / 1024 / 1024} MB.` },
+        413,
+      );
+    }
+
+    filename = file.name;
+    buffer = Buffer.from(await file.arrayBuffer());
+
+    const [created] = await db
+      .insert(documents)
+      .values({
+        sessionId,
+        uploadedByUserId: userId,
+        originalFilename: filename,
+        fileSizeBytes: buffer.byteLength,
+        checksumSha256: createHash("sha256").update(buffer).digest("hex"),
+      })
+      .returning({ id: documents.id });
+    documentId = created.id;
+
+    // The row is useless without its blob, so don't leave one behind.
+    try {
+      await uploadObject(sourceDocxKey(sessionId, documentId), buffer, DOCX_MIME_TYPE);
+    } catch (error) {
+      await db.delete(documents).where(eq(documents.id, documentId));
+      console.error(`[api/convert] document=${documentId} upload failed`, error);
+      return json({ error: "Could not store the uploaded document." }, 500);
+    }
   }
 
-  if (file.size > MAX_FILE_SIZE_BYTES) {
-    return NextResponse.json(
-      { error: `File too large. Maximum size is ${MAX_FILE_SIZE_BYTES / 1024 / 1024} MB.` },
-      { status: 413 }
-    )
-  }
+  // conversion_jobs is unique per document, so a re-convert updates in place.
+  const startedAt = new Date().toISOString();
+  const [job] = await db
+    .insert(conversionJobs)
+    .values({
+      documentId,
+      requestedByUserId: userId,
+      status: "processing",
+      startedAt,
+      attemptCount: 1,
+      provider: PROVIDER,
+    })
+    .onConflictDoUpdate({
+      target: conversionJobs.documentId,
+      set: {
+        status: "processing",
+        startedAt,
+        completedAt: null,
+        errorCode: null,
+        errorMessage: null,
+        attemptCount: sql`${conversionJobs.attemptCount} + 1`,
+        updatedAt: startedAt,
+      },
+    })
+    .returning({ id: conversionJobs.id });
+  const jobId = job.id;
 
-  const buffer = Buffer.from(await file.arrayBuffer())
+  console.log(`[api/convert] job=${jobId} user=${userId} file=${filename}`);
 
-  // ── INTERACTION POINT 2: FILE STORAGE + documents + artifacts ────────────
-  // Upload the .docx buffer to S3/MinIO and receive a storage key.
-  // Insert a `documents` row with file metadata (filename, size, checksum).
-  // Insert an `artifacts` row (artifact_type: source_docx) with the storage key.
-  const s3Key = `pending/${Date.now()}_${filename}` // placeholder until storage is wired up
-
-  // ── INTERACTION POINT 3a: JOB TRACKING — create conversion_jobs row ───────
-  // Insert a `conversion_jobs` row linked to the document, with status "processing".
-  // This makes the job visible in the admin board before conversion completes.
-  const jobId = `job_${Date.now()}` // placeholder — will be a UUID from PostgreSQL
-
-  console.log(`[api/convert] job=${jobId} user=${userId} file=${filename}`)
-
-  // ── INTERACTION POINT 4: AI CONVERSION ───────────────────────────────────
-  // Two-stage pipeline: Stage 1 converts the DOCX to accessible HTML,
-  // Stage 2 validates it and returns structured AccessibilityError[].
-  const result = await convertDocx(buffer, filename)
-
-  // ── INTERACTION POINT 3b: JOB TRACKING — update conversion_jobs row ───────
-  // Update conversion_jobs status to "completed" or "failed".
-  // On success: insert an artifacts row (artifact_type: html_output) with the HTML
-  // storage key, and insert one validation_findings row per AccessibilityError.
+  // Deliberately outside a transaction: this is a multi-second model call and
+  // would pin a pooled connection for its whole duration.
+  const result = await convertDocx(buffer, filename);
 
   if ("error" in result) {
-    console.error(`[api/convert] job=${jobId} failed: ${result.error}`)
-    return NextResponse.json(
-      { error: result.error, detail: result.detail, jobId },
-      { status: 500 }
-    )
+    const failedAt = new Date().toISOString();
+    await db.transaction(async (tx) => {
+      await tx
+        .update(conversionJobs)
+        .set({
+          status: "failed",
+          completedAt: failedAt,
+          updatedAt: failedAt,
+          errorCode: "conversion_failed",
+          errorMessage: result.error,
+        })
+        .where(eq(conversionJobs.id, jobId));
+      await tx.insert(jobEvents).values({
+        jobId,
+        eventType: "conversion_failed",
+        message: result.error,
+        metadata: { detail: result.detail ?? null },
+      });
+    });
+
+    console.error(`[api/convert] job=${jobId} failed: ${result.error}`);
+    return json({ error: result.error, detail: result.detail, jobId, documentId }, 500);
   }
 
+  const htmlKey = htmlOutputKey(sessionId, documentId);
+  try {
+    await uploadObject(htmlKey, result.html, "text/html; charset=utf-8");
+  } catch (error) {
+    console.error(`[api/convert] job=${jobId} html upload failed`, error);
+    return json({ error: "Could not store the converted document." }, 500);
+  }
+
+  const completedAt = new Date().toISOString();
+  await db.transaction(async (tx) => {
+    await tx
+      .update(conversionJobs)
+      .set({
+        status: "completed",
+        completedAt,
+        updatedAt: completedAt,
+        modelName: result.model,
+      })
+      .where(eq(conversionJobs.id, jobId));
+
+    // uq_available_artifact_per_job_type allows one available artifact per type,
+    // so a re-convert updates the existing row rather than inserting a second.
+    for (const artifact of [
+      {
+        artifactType: "source_docx" as const,
+        filename,
+        mimeType: DOCX_MIME_TYPE,
+        storageKey: sourceDocxKey(sessionId, documentId),
+        fileSizeBytes: buffer.byteLength,
+        previewSnippet: null,
+      },
+      {
+        artifactType: "html_output" as const,
+        filename: filename.replace(/\.docx$/i, ".html"),
+        mimeType: "text/html",
+        storageKey: htmlKey,
+        fileSizeBytes: Buffer.byteLength(result.html),
+        previewSnippet: result.html.slice(0, 500),
+      },
+    ]) {
+      await tx
+        .insert(artifacts)
+        .values({ jobId, artifactStatus: "available", ...artifact })
+        .onConflictDoUpdate({
+          target: [artifacts.jobId, artifacts.artifactType],
+          targetWhere: sql`artifact_status = 'available'`,
+          set: {
+            filename: artifact.filename,
+            mimeType: artifact.mimeType,
+            storageKey: artifact.storageKey,
+            fileSizeBytes: artifact.fileSizeBytes,
+            previewSnippet: artifact.previewSnippet,
+            createdAt: completedAt,
+          },
+        });
+    }
+
+    // Findings have no natural key, so replace the previous run's wholesale.
+    await tx.delete(validationFindings).where(eq(validationFindings.jobId, jobId));
+    if (result.errors.length > 0) {
+      await tx.insert(validationFindings).values(
+        result.errors.map((issue) => ({
+          jobId,
+          severity: issue.severity,
+          ruleCode: issue.type,
+          title: FINDING_TITLES[issue.type] ?? FINDING_TITLES.other,
+          message: issue.message,
+          suggestion: issue.suggestion,
+          wcag: issue.wcag ?? null,
+          location: issue.element ? { element: issue.element } : null,
+        })),
+      );
+    }
+
+    await tx.insert(jobEvents).values({
+      jobId,
+      eventType: "conversion_completed",
+      message: `Converted ${filename}`,
+      metadata: {
+        model: result.model,
+        tokensUsed: result.tokensUsed,
+        findingCount: result.errors.length,
+        extractionWarnings: result.extractionWarnings,
+      },
+    });
+  });
+
   console.log(
-    `[api/convert] job=${jobId} completed. errors=${result.errors.length} tokens=${result.tokensUsed}`
-  )
+    `[api/convert] job=${jobId} completed. errors=${result.errors.length} tokens=${result.tokensUsed}`,
+  );
 
   return NextResponse.json({
     jobId,
+    documentId,
     html: result.html,
     errors: result.errors,
     model: result.model,
     tokensUsed: result.tokensUsed,
     extractionWarnings: result.extractionWarnings,
-  })
+  });
 }

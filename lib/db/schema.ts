@@ -371,6 +371,10 @@ export const validationFindings = pgTable(
     ruleCode: text("rule_code"),
     title: text().notNull(),
     message: text().notNull(),
+    /** How to fix the issue. Produced by the AI validation stage. */
+    suggestion: text(),
+    /** WCAG criterion the finding violates, e.g. "WCAG 1.1.1". */
+    wcag: text(),
     location: jsonb(),
     userVisible: boolean("user_visible").default(true).notNull(),
     resolved: boolean().default(false).notNull(),

@@ -1,7 +1,8 @@
 "use client";
 
 import { Info } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getDocumentHtml } from "@/lib/actions/documents";
 import {
   Accordion,
   AccordionContent,
@@ -30,22 +31,51 @@ export default function ConversionResultDialog({
   onOpenChange,
 }: ConversionResultDialogProps): React.JSX.Element | null {
   const [copied, setCopied] = useState(false);
+  // undefined = not fetched yet, null = unavailable. Written only from the
+  // async callbacks below, so the effect never sets state synchronously.
+  const [fetchedHtml, setFetchedHtml] = useState<string | null | undefined>(
+    undefined,
+  );
+
+  // Documents restored from the database carry no html — it lives in storage
+  // and is only worth fetching once someone actually opens the result.
+  const documentId = document?.documentId;
+  const needsHtml = open && document?.status === "success" && !document.html;
+  const isLoadingHtml = Boolean(needsHtml) && fetchedHtml === undefined;
+
+  useEffect(() => {
+    if (!needsHtml || !documentId) return;
+
+    let cancelled = false;
+    getDocumentHtml(documentId)
+      .then((html) => {
+        if (!cancelled) setFetchedHtml(html);
+      })
+      .catch(() => {
+        if (!cancelled) setFetchedHtml(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [needsHtml, documentId]);
 
   if (!document) return null;
 
+  const html = document.html ?? fetchedHtml ?? undefined;
   const isSuccess = document.status === "success";
   const isError = document.status === "error";
 
   const handleCopy = async () => {
-    if (!document.html) return;
-    await navigator.clipboard.writeText(document.html);
+    if (!html) return;
+    await navigator.clipboard.writeText(html);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleDownload = () => {
-    if (!document.html) return;
-    const blob = new Blob([document.html], { type: "text/html" });
+    if (!html) return;
+    const blob = new Blob([html], { type: "text/html" });
     const url = URL.createObjectURL(blob);
     const anchor = window.document.createElement("a");
     anchor.href = url;
@@ -79,7 +109,15 @@ export default function ConversionResultDialog({
           <p className="text-sm text-destructive">{document.errorMessage}</p>
         )}
 
-        {isSuccess && document.html && (
+        {isSuccess && !html && (
+          <p className="text-sm text-muted-foreground">
+            {isLoadingHtml
+              ? "Loading converted HTML…"
+              : "The converted HTML for this document could not be loaded."}
+          </p>
+        )}
+
+        {isSuccess && html && (
           <div className="flex flex-col gap-4">
             <div className="flex flex-wrap gap-2">
               <Button onClick={handleCopy}>
@@ -95,7 +133,7 @@ export default function ConversionResultDialog({
                 <AccordionTrigger>View HTML output</AccordionTrigger>
                 <AccordionContent>
                   <pre className="max-h-64 overflow-auto rounded-xl bg-muted p-3 text-xs whitespace-pre-wrap">
-                    {document.html}
+                    {html}
                   </pre>
                 </AccordionContent>
               </AccordionItem>

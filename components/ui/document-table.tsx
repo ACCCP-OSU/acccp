@@ -2,7 +2,7 @@
 
 import { Lock, LockOpen, X } from "lucide-react";
 import { useState } from "react";
-import { formatBytes, formatUploadTime } from "@/lib/mock/conversion";
+import { formatBytes, formatUploadTime } from "@/lib/format";
 import type { ConversionStatus, UploadedDocument } from "@/lib/types/document";
 import { Badge } from "./badge";
 import { Button } from "./button";
@@ -31,7 +31,7 @@ import {
 interface DocumentTableProps {
   documents: UploadedDocument[];
   onToggleLock: (docId: string) => void;
-  onDeleteDocument: (docId: string) => void;
+  onDeleteDocument: (docId: string) => void | Promise<void>;
 }
 
 function statusBadge(status: ConversionStatus): React.JSX.Element {
@@ -194,7 +194,9 @@ export default function DocumentTable({
         </CardContent>
       </Card>
 
+      {/* Keyed so the fetched html resets when a different document is opened. */}
       <ConversionResultDialog
+        key={selectedDocument?.id}
         document={selectedDocument}
         open={dialogOpen}
         onOpenChange={setDialogOpen}

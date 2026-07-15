@@ -1,52 +1,144 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
-import { runMockConversion } from "@/lib/mock/conversion";
-import type { ConversionStatus } from "@/lib/types/document";
-import { useSession } from "@/contexts/session-context";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { deleteDocument } from "@/lib/actions/documents";
+import type { UploadedDocument } from "@/lib/types/document";
 import { Button } from "./button";
 import DocumentTable from "./document-table";
 import FileUpload from "./file-upload";
 
-export default function DocumentWorkspace(): React.JSX.Element {
-  const {
-    documents,
-    addDocuments,
-    toggleDocumentLock,
-    removeDocument,
-    updateDocument,
-  } = useSession();
+interface DocumentWorkspaceProps {
+  sessionId: string;
+  initialDocuments: UploadedDocument[];
+}
 
-  const conversionHandlesRef = useRef<Map<string, { cancel: () => void }>>(
-    new Map(),
+export default function DocumentWorkspace({
+  sessionId,
+  initialDocuments,
+}: DocumentWorkspaceProps): React.JSX.Element {
+  const [documents, setDocuments] = useState<UploadedDocument[]>(initialDocuments);
+  const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
+
+  const isProcessing = documents.some(
+    (doc) => doc.status === "processing" || doc.status === "queued",
   );
-
-  const isProcessing = documents.some((doc) => doc.status === "processing");
   const hasDocuments = documents.length > 0;
   const canConvert = hasDocuments && !isProcessing;
 
   useEffect(() => {
-    const handles = conversionHandlesRef.current;
+    const controllers = abortControllersRef.current;
     return () => {
-      handles.forEach((handle) => handle.cancel());
-      handles.clear();
+      controllers.forEach((controller) => controller.abort());
+      controllers.clear();
     };
   }, []);
 
-  const handleStatusChange = useCallback(
-    (docId: string, status: ConversionStatus) => {
-      updateDocument(docId, { status });
+  const updateDocument = useCallback(
+    (docId: string, patch: Partial<UploadedDocument>) => {
+      setDocuments((prev) =>
+        prev.map((doc) => (doc.id === docId ? { ...doc, ...patch } : doc)),
+      );
     },
-    [updateDocument],
+    [],
   );
 
+  const addDocuments = useCallback((files: File[]) => {
+    if (files.length === 0) return;
+    setDocuments((prev) => [
+      ...prev,
+      ...files.map((file) => ({
+        id: crypto.randomUUID(),
+        name: file.name,
+        size: file.size,
+        uploadedAt: new Date(),
+        status: "idle" as const,
+        locked: false,
+        file,
+      })),
+    ]);
+  }, []);
+
+  const toggleDocumentLock = useCallback((docId: string) => {
+    setDocuments((prev) =>
+      prev.map((doc) =>
+        doc.id === docId ? { ...doc, locked: !doc.locked } : doc,
+      ),
+    );
+  }, []);
+
   const handleDeleteDocument = useCallback(
-    (docId: string) => {
-      conversionHandlesRef.current.get(docId)?.cancel();
-      conversionHandlesRef.current.delete(docId);
-      removeDocument(docId);
+    async (docId: string) => {
+      abortControllersRef.current.get(docId)?.abort();
+      abortControllersRef.current.delete(docId);
+
+      const doc = documents.find((d) => d.id === docId);
+      setDocuments((prev) => prev.filter((d) => d.id !== docId));
+
+      if (doc?.documentId) await deleteDocument(doc.documentId);
     },
-    [removeDocument],
+    [documents],
+  );
+
+  const convertDocument = useCallback(
+    async (doc: UploadedDocument) => {
+      const form = new FormData();
+      form.append("sessionId", sessionId);
+
+      // A stored document is re-read from storage; a freshly picked one is sent.
+      if (doc.documentId) form.append("documentId", doc.documentId);
+      else if (doc.file) form.append("file", doc.file);
+      else {
+        updateDocument(doc.id, {
+          status: "error",
+          errorMessage: "This document is no longer available. Re-upload it.",
+        });
+        return;
+      }
+
+      const controller = new AbortController();
+      abortControllersRef.current.set(doc.id, controller);
+      updateDocument(doc.id, {
+        status: "processing",
+        html: undefined,
+        errorMessage: undefined,
+      });
+
+      try {
+        const response = await fetch("/api/convert", {
+          method: "POST",
+          body: form,
+          signal: controller.signal,
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+          updateDocument(doc.id, {
+            status: "error",
+            html: undefined,
+            errorMessage: data.error ?? "Conversion failed.",
+          });
+          return;
+        }
+
+        updateDocument(doc.id, {
+          status: "success",
+          documentId: data.documentId,
+          html: data.html,
+          errorMessage: undefined,
+        });
+      } catch {
+        // An abort means the user navigated away or removed the row.
+        if (controller.signal.aborted) return;
+        updateDocument(doc.id, {
+          status: "error",
+          html: undefined,
+          errorMessage: "Conversion failed. Please try again.",
+        });
+      } finally {
+        abortControllersRef.current.delete(doc.id);
+      }
+    },
+    [sessionId, updateDocument],
   );
 
   const runConversion = useCallback(() => {
@@ -54,55 +146,21 @@ export default function DocumentWorkspace(): React.JSX.Element {
     if (targets.length === 0) return;
 
     targets.forEach((doc) => {
-      conversionHandlesRef.current.get(doc.id)?.cancel();
-
-      updateDocument(doc.id, {
-        status: "queued",
-        html: undefined,
-        errorMessage: undefined,
-      });
-
-      const handle = runMockConversion(doc, (status) =>
-        handleStatusChange(doc.id, status),
-      );
-
-      conversionHandlesRef.current.set(doc.id, handle);
-
-      handle.promise.then((result) => {
-        conversionHandlesRef.current.delete(doc.id);
-        if (result.status === "success") {
-          updateDocument(doc.id, {
-            status: "success",
-            html: result.html,
-            errorMessage: undefined,
-          });
-        } else {
-          updateDocument(doc.id, {
-            status: "error",
-            html: undefined,
-            errorMessage: result.errorMessage,
-          });
-        }
-      });
+      abortControllersRef.current.get(doc.id)?.abort();
+      updateDocument(doc.id, { status: "queued" });
     });
-  }, [documents, handleStatusChange, updateDocument]);
+    targets.forEach((doc) => void convertDocument(doc));
+  }, [documents, convertDocument, updateDocument]);
 
   return (
     <div className="mt-8 flex flex-col gap-6">
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-medium text-foreground">Upload documents</h2>
-        <FileUpload
-          onFilesSelected={addDocuments}
-          disabled={isProcessing}
-        />
+        <FileUpload onFilesSelected={addDocuments} disabled={isProcessing} />
       </section>
 
       <section>
-        <Button
-          size="lg"
-          disabled={!canConvert}
-          onClick={runConversion}
-        >
+        <Button size="lg" disabled={!canConvert} onClick={runConversion}>
           Convert
         </Button>
         {!hasDocuments && (
