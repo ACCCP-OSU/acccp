@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { LiteLLMConfig } from "./litellm";
+import type { LiteLLMConfig } from "@/lib/litellm";
 
 vi.mock("mammoth", () => ({
   default: {
@@ -15,7 +15,7 @@ const callLiteLLMMock = vi.fn();
 const fetchModelPricingMock = vi.fn();
 
 vi.mock("./litellm", async () => {
-  const actual = await vi.importActual<typeof import("./litellm")>("./litellm");
+  const actual = await vi.importActual<typeof import("../lib/litellm")>("./litellm");
   return {
     ...actual,
     callLiteLLM: callLiteLLMMock,
@@ -31,7 +31,7 @@ const TEST_CONFIG: LiteLLMConfig = {
 };
 
 // Imported after the mocks above so convert.ts picks up the mocked module.
-const { convertDocx, validateWithAI } = await import("./convert");
+const { convertDocx, validateWithAI } = await import("../lib/convert");
 
 describe("validateWithAI", () => {
   beforeEach(() => {

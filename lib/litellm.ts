@@ -17,7 +17,7 @@ export interface LiteLLMConfig {
 export function getLiteLLMConfig(): LiteLLMConfig {
   const baseUrl = process.env.LITELLM_BASE_URL
   const apiKey = process.env.LITELLM_API_KEY
-  const model = process.env.LITELLM_MODEL ?? "gpt-5.4-nano-2026-03-17"
+  const model = process.env.LITELLM_MODEL ?? "gpt-5.4-nano-2026-03-17" // Make sure this matches your API key
   if (!baseUrl) throw new Error("Missing env var: LITELLM_BASE_URL")
   if (!apiKey) throw new Error("Missing env var: LITELLM_API_KEY")
   return { baseUrl, apiKey, model }

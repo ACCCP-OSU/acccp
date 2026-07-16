@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { toConversionStatus } from "./conversion-status";
+import { toConversionStatus } from "@/lib/conversion-status";
 
 describe("toConversionStatus", () => {
   it("maps every job_status to a ConversionStatus", () => {

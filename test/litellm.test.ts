@@ -5,7 +5,7 @@ import {
   clearModelPricingCache,
   computeCallCostUsd,
   fetchModelPricing,
-} from "./litellm";
+} from "@/lib/litellm";
 
 const CONFIG = { baseUrl: "https://litellm.test", apiKey: "test-key" };
 

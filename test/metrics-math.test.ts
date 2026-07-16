@@ -6,7 +6,7 @@ import {
   safePercentage,
   summarizeJobStatusCounts,
   totalPages,
-} from "./metrics-math";
+} from "@/lib/metrics-math";
 
 describe("roundTo", () => {
   it("rounds to the given number of decimals", () => {
