@@ -9,6 +9,7 @@ import {
   foreignKey,
   bigint,
   integer,
+  numeric,
   boolean,
   jsonb,
   unique,
@@ -50,6 +51,7 @@ export const reviewStatus = pgEnum("review_status", [
   "reviewed",
 ]);
 export const userRole = pgEnum("user_role", ["pending", "instructor", "admin"]);
+export const modelCallStage = pgEnum("model_call_stage", ["convert", "validate"]);
 
 export const users = pgTable(
   "users",
@@ -553,6 +555,47 @@ export const conversionJobs = pgTable(
     ),
   ]
 ).enableRLS();
+export const modelCalls = pgTable(
+  "model_calls",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    jobId: uuid("job_id").notNull(),
+    stage: modelCallStage().notNull(),
+    model: text().notNull(),
+    promptTokens: integer("prompt_tokens").notNull(),
+    completionTokens: integer("completion_tokens").notNull(),
+    // Snapshotted at call time from LiteLLM /model/info so historical spend
+    // doesn't shift if pricing changes later. Null when pricing lookup fails.
+    costUsd: numeric("cost_usd", { precision: 12, scale: 6 }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_model_calls_job_id").using(
+      "btree",
+      table.jobId.asc().nullsLast().op("uuid_ops")
+    ),
+    index("idx_model_calls_created_at").using(
+      "btree",
+      table.createdAt.desc().nullsFirst().op("timestamptz_ops")
+    ),
+    foreignKey({
+      columns: [table.jobId],
+      foreignColumns: [conversionJobs.id],
+      name: "model_calls_job_id_fkey",
+    }).onDelete("cascade"),
+    check(
+      "model_calls_prompt_tokens_nonnegative_chk",
+      sql`prompt_tokens >= 0`
+    ),
+    check(
+      "model_calls_completion_tokens_nonnegative_chk",
+      sql`completion_tokens >= 0`
+    ),
+  ]
+).enableRLS();
+
 export const adminFindingSummary = pgView("admin_finding_summary", {
   severity: findingSeverity(),
   category: text(),

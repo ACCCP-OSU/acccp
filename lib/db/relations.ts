@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { users, sessions, documents, conversionJobs, artifacts, validationFindings, jobEvents, authSessions, accounts } from "./schema";
+import { users, sessions, documents, conversionJobs, artifacts, validationFindings, jobEvents, modelCalls, authSessions, accounts } from "./schema";
 
 export const authSessionsRelations = relations(authSessions, ({one}) => ({
 	user: one(users, {
@@ -67,6 +67,7 @@ export const conversionJobsRelations = relations(conversionJobs, ({one, many}) =
 	artifacts: many(artifacts),
 	validationFindings: many(validationFindings),
 	jobEvents: many(jobEvents),
+	modelCalls: many(modelCalls),
 	document: one(documents, {
 		fields: [conversionJobs.documentId],
 		references: [documents.id]
@@ -93,6 +94,13 @@ export const validationFindingsRelations = relations(validationFindings, ({one})
 export const jobEventsRelations = relations(jobEvents, ({one}) => ({
 	conversionJob: one(conversionJobs, {
 		fields: [jobEvents.jobId],
+		references: [conversionJobs.id]
+	}),
+}));
+
+export const modelCallsRelations = relations(modelCalls, ({one}) => ({
+	conversionJob: one(conversionJobs, {
+		fields: [modelCalls.jobId],
 		references: [conversionJobs.id]
 	}),
 }));

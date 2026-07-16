@@ -24,6 +24,14 @@ import {
   ACCESSIBILITY_SYSTEM_PROMPT,
   buildUserMessage,
 } from "./prompts/accessibility"
+import {
+  callLiteLLM,
+  computeCallCostUsd,
+  fetchModelPricing,
+  getLiteLLMConfig,
+  type LiteLLMCallResult,
+  type LiteLLMConfig,
+} from "./litellm"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -51,6 +59,16 @@ export interface AccessibilityError {
   wcag?: string
 }
 
+/** One LiteLLM call's usage, priced from LiteLLM's /model/info at call time. */
+export interface ModelCallUsage {
+  stage: "convert" | "validate"
+  model: string
+  promptTokens: number
+  completionTokens: number
+  /** Null when pricing couldn't be looked up — tokens are still counted. */
+  costUsd: number | null
+}
+
 /** Returned by convertDocx() on success. */
 export interface ConversionResult {
   /** Accessible HTML fragment, ready to paste into Canvas RCE */
@@ -59,6 +77,8 @@ export interface ConversionResult {
   model: string
   /** Total tokens used across both AI calls */
   tokensUsed: number
+  /** Per-call usage/cost breakdown, for persisting to model_calls */
+  calls: ModelCallUsage[]
   /** Non-fatal warnings from mammoth during extraction */
   extractionWarnings: string[]
 }
@@ -67,60 +87,26 @@ export interface ConversionResult {
 export interface ConversionError {
   error: string
   detail?: string
+  /** Usage incurred before the failure, if any — still billable. */
+  calls?: ModelCallUsage[]
 }
 
-// ─── LiteLLM client ───────────────────────────────────────────────────────────
-
-interface LiteLLMConfig {
-  baseUrl: string
-  apiKey: string
-  model: string
-}
-
-function getConfig(): LiteLLMConfig {
-  const baseUrl = process.env.LITELLM_BASE_URL
-  const apiKey = process.env.LITELLM_API_KEY
-  const model = process.env.LITELLM_MODEL ?? "gpt-5.4-nano-2026-03-17"
-  if (!baseUrl) throw new Error("Missing env var: LITELLM_BASE_URL")
-  if (!apiKey) throw new Error("Missing env var: LITELLM_API_KEY")
-  return { baseUrl, apiKey, model }
-}
-
-async function callLiteLLM(
-  systemPrompt: string,
-  userMessage: string,
-  config: LiteLLMConfig
-): Promise<{ content: string; model: string; tokensUsed: number }> {
-  const response = await fetch(`${config.baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.apiKey}`,
-    },
-    body: JSON.stringify({
-      model: config.model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userMessage },
-      ],
-    }),
-  })
-
-  if (!response.ok) {
-    const body = await response.text()
-    throw new Error(`LiteLLM error ${response.status}: ${body}`)
-  }
-
-  const data = (await response.json()) as {
-    choices: Array<{ message: { content: string } }>
-    model: string
-    usage: { total_tokens: number }
-  }
-
+async function toModelCallUsage(
+  stage: ModelCallUsage["stage"],
+  call: LiteLLMCallResult,
+  config: Pick<LiteLLMConfig, "baseUrl" | "apiKey">
+): Promise<ModelCallUsage> {
+  const pricing = await fetchModelPricing(call.model, config)
   return {
-    content: data.choices[0].message.content.trim(),
-    model: data.model,
-    tokensUsed: data.usage?.total_tokens ?? 0,
+    stage,
+    model: call.model,
+    promptTokens: call.promptTokens,
+    completionTokens: call.completionTokens,
+    costUsd: computeCallCostUsd(
+      call.promptTokens,
+      call.completionTokens,
+      pricing
+    ),
   }
 }
 
@@ -201,21 +187,17 @@ Review the HTML for violations of WCAG 2.1 AA and Canvas LMS constraints. For ev
 - Do not invent issues that are not present in the HTML.
 `
 
-async function validateWithAI(
+export async function validateWithAI(
   html: string,
   config: LiteLLMConfig
-): Promise<{ errors: AccessibilityError[]; tokensUsed: number }> {
+): Promise<{ errors: AccessibilityError[]; call: LiteLLMCallResult }> {
   const userMessage = `Please audit the following Canvas HTML fragment for accessibility issues:\n\n${html}`
 
-  const { content, tokensUsed } = await callLiteLLM(
-    VALIDATION_SYSTEM_PROMPT,
-    userMessage,
-    config
-  )
+  const call = await callLiteLLM(VALIDATION_SYSTEM_PROMPT, userMessage, config)
 
   try {
-    const errors = JSON.parse(content) as AccessibilityError[]
-    return { errors: Array.isArray(errors) ? errors : [], tokensUsed }
+    const errors = JSON.parse(call.content) as AccessibilityError[]
+    return { errors: Array.isArray(errors) ? errors : [], call }
   } catch {
     // If the AI returns malformed JSON, surface it as a single warning
     return {
@@ -227,7 +209,7 @@ async function validateWithAI(
           suggestion: "Review the HTML manually for accessibility issues.",
         },
       ],
-      tokensUsed,
+      call,
     }
   }
 }
@@ -245,8 +227,9 @@ export async function convertDocx(
   buffer: Buffer,
   filename: string
 ): Promise<ConversionResult | ConversionError> {
+  const calls: ModelCallUsage[] = []
   try {
-    const config = getConfig()
+    const config = getLiteLLMConfig()
 
     // Stage 1: extract HTML from the .docx
     console.log(`[convert] Extracting: ${filename}`)
@@ -261,33 +244,38 @@ export async function convertDocx(
     // Stage 1: convert to accessible Canvas HTML
     const userMessage = buildUserMessage(mammothHtml)
     console.log(`[convert] Stage 1: Converting to HTML...`)
-    const {
-      content: html,
-      model,
-      tokensUsed: conversionTokens,
-    } = await callLiteLLM(ACCESSIBILITY_SYSTEM_PROMPT, userMessage, config)
+    const conversionCall = await callLiteLLM(
+      ACCESSIBILITY_SYSTEM_PROMPT,
+      userMessage,
+      config
+    )
+    calls.push(await toModelCallUsage("convert", conversionCall, config))
+    const html = conversionCall.content
+    const model = conversionCall.model
 
     // Stage 2: validate the output for accessibility issues
     console.log(`[convert] Stage 2: Validating accessibility...`)
-    const { errors, tokensUsed: validationTokens } = await validateWithAI(
-      html,
-      config
+    const { errors, call: validationCall } = await validateWithAI(html, config)
+    calls.push(await toModelCallUsage("validate", validationCall, config))
+
+    const tokensUsed = calls.reduce(
+      (sum, c) => sum + c.promptTokens + c.completionTokens,
+      0
     )
 
-    console.log(
-      `[convert] Done. ${errors.length} issue(s) found. Tokens: ${conversionTokens + validationTokens}`
-    )
+    console.log(`[convert] Done. ${errors.length} issue(s) found. Tokens: ${tokensUsed}`)
 
     return {
       html,
       errors,
       model,
-      tokensUsed: conversionTokens + validationTokens,
+      tokensUsed,
+      calls,
       extractionWarnings,
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    return { error: "Conversion failed", detail: message }
+    return { error: "Conversion failed", detail: message, calls }
   }
 }
 

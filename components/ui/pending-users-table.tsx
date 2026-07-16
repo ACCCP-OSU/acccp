@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 
 import { approveUser, rejectUser } from "@/lib/actions/admin-users";
 import { Button } from "./button";
+import AdminTablePagination from "./admin-table-pagination";
 import {
   Table,
   TableBody,
@@ -23,6 +24,8 @@ export interface PendingUser {
 
 interface PendingUsersTableProps {
   users: PendingUser[];
+  page: number;
+  totalPages: number;
 }
 
 function formatRequestedAt(date: Date): string {
@@ -34,6 +37,8 @@ function formatRequestedAt(date: Date): string {
 
 export default function PendingUsersTable({
   users,
+  page,
+  totalPages,
 }: PendingUsersTableProps): React.JSX.Element {
   const [rows, setRows] = useState(users);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -58,50 +63,55 @@ export default function PendingUsersTable({
   };
 
   return (
-    <Table className="w-full max-w-xl">
-      <TableCaption>
-        {rows.length === 0
-          ? "No users pending approval."
-          : "Users pending approval."}
-      </TableCaption>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Name</TableHead>
-          <TableHead>Email</TableHead>
-          <TableHead>Requested</TableHead>
-          <TableHead className="w-32" />
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rows.map((row) => {
-          const rowPending = isPending && pendingId === row.id;
-          return (
-            <TableRow key={row.id}>
-              <TableCell>{row.displayName}</TableCell>
-              <TableCell>{row.email}</TableCell>
-              <TableCell>{formatRequestedAt(row.createdAt)}</TableCell>
-              <TableCell className="flex gap-2">
-                <Button
-                  size="sm"
-                  disabled={rowPending}
-                  onClick={() => handleApprove(row.id)}
-                >
-                  Approve
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                  disabled={rowPending}
-                  onClick={() => handleReject(row.id)}
-                >
-                  Reject
-                </Button>
-              </TableCell>
-            </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
+    <div className="flex w-full max-w-xl flex-col gap-4">
+      <Table>
+        <TableCaption>
+          {rows.length === 0
+            ? "No users pending approval."
+            : "Users pending approval."}
+        </TableCaption>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>Email</TableHead>
+            <TableHead>Requested</TableHead>
+            <TableHead className="w-32" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row) => {
+            const rowPending = isPending && pendingId === row.id;
+            return (
+              <TableRow key={row.id}>
+                <TableCell>{row.displayName}</TableCell>
+                <TableCell>{row.email}</TableCell>
+                <TableCell>{formatRequestedAt(row.createdAt)}</TableCell>
+                <TableCell className="flex gap-2">
+                  <Button
+                    size="sm"
+                    disabled={rowPending}
+                    onClick={() => handleApprove(row.id)}
+                  >
+                    Approve
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    disabled={rowPending}
+                    onClick={() => handleReject(row.id)}
+                  >
+                    Reject
+                  </Button>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+      {totalPages > 1 && (
+        <AdminTablePagination page={page} totalPages={totalPages} param="usersPage" />
+      )}
+    </div>
   );
 }

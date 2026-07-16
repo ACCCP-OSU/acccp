@@ -3,6 +3,7 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 
 import { verifyRoleOrRedirect } from "@/lib/auth";
+import { toConversionStatus } from "@/lib/conversion-status";
 import { db } from "@/lib/db";
 import {
   artifacts,
@@ -16,37 +17,13 @@ import {
   removeObjects,
   sourceDocxKey,
 } from "@/lib/storage";
-import type { ConversionStatus, UploadedDocument } from "@/lib/types/document";
+import type { UploadedDocument } from "@/lib/types/document";
 
 // RLS is enabled but has no policies, so ownership is enforced here: every
 // query joins `sessions` and constrains owner_user_id.
 async function requireUserId(): Promise<string> {
   const session = await verifyRoleOrRedirect(["instructor", "admin"]);
   return session.user.id;
-}
-
-/**
- * job_status carries states the dashboard has no concept of. `needs_review`
- * still has usable HTML, so it reads as success; the terminal states that
- * leave nothing to show read as errors.
- */
-function toConversionStatus(status: string | null): ConversionStatus {
-  switch (status) {
-    case "queued":
-      return "queued";
-    case "processing":
-      return "processing";
-    case "completed":
-    case "needs_review":
-      return "success";
-    case "failed":
-    case "expired":
-    case "cancelled":
-      return "error";
-    default:
-      // No job row yet: uploaded but never converted.
-      return "idle";
-  }
 }
 
 export async function listDocuments(sessionId: string): Promise<UploadedDocument[]> {

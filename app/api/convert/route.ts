@@ -39,6 +39,7 @@ import {
   conversionJobs,
   documents,
   jobEvents,
+  modelCalls,
   sessions,
   validationFindings,
 } from "@/lib/db/schema";
@@ -226,6 +227,20 @@ export async function POST(req: NextRequest) {
         message: result.error,
         metadata: { detail: result.detail ?? null },
       });
+      // Usage incurred before the failure (e.g. stage 1 succeeded, stage 2
+      // threw) is still billable, so it's still recorded.
+      if (result.calls && result.calls.length > 0) {
+        await tx.insert(modelCalls).values(
+          result.calls.map((call) => ({
+            jobId,
+            stage: call.stage,
+            model: call.model,
+            promptTokens: call.promptTokens,
+            completionTokens: call.completionTokens,
+            costUsd: call.costUsd !== null ? String(call.costUsd) : null,
+          })),
+        );
+      }
     });
 
     console.error(`[api/convert] job=${jobId} failed: ${result.error}`);
@@ -317,6 +332,17 @@ export async function POST(req: NextRequest) {
         extractionWarnings: result.extractionWarnings,
       },
     });
+
+    await tx.insert(modelCalls).values(
+      result.calls.map((call) => ({
+        jobId,
+        stage: call.stage,
+        model: call.model,
+        promptTokens: call.promptTokens,
+        completionTokens: call.completionTokens,
+        costUsd: call.costUsd !== null ? String(call.costUsd) : null,
+      })),
+    );
   });
 
   console.log(
