@@ -57,7 +57,6 @@ export const users = pgTable(
   "users",
   {
     id: uuid().defaultRandom().primaryKey().notNull(),
-    externalSubject: text("external_subject"),
     email: text().notNull(),
     displayName: text("display_name").notNull(),
     emailVerified: boolean("email_verified").default(false).notNull(),
@@ -79,9 +78,6 @@ export const users = pgTable(
   },
   (table) => [
     uniqueIndex("uq_users_email_lower").using("btree", sql`lower(email)`),
-    uniqueIndex("uq_users_external_subject")
-      .using("btree", table.externalSubject.asc().nullsLast().op("text_ops"))
-      .where(sql`(external_subject IS NOT NULL)`),
   ]
 ).enableRLS();
 
