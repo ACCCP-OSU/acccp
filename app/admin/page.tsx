@@ -1,4 +1,8 @@
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+
 import AdminMetrics from "@/components/ui/admin-metrics";
+import { Button } from "@/components/ui/button";
 import PendingUsersTable from "@/components/ui/pending-users-table";
 import { listPendingUsersPage } from "@/lib/actions/admin-metrics";
 import { verifyRoleOrRedirect } from "@/lib/auth";
@@ -32,7 +36,19 @@ export default async function AdminPage({
   const defaultTab = params.jobsPage ? "metrics" : "users";
 
   return (
-    <main className="flex min-h-full items-center justify-center py-12">
+    <main className="flex min-h-full flex-col items-center gap-6 py-12">
+      <div className="w-full max-w-xl">
+        <Button
+          render={
+            <Link href="/dashboard">
+              <ArrowLeft />
+              Back to Dashboard
+            </Link>
+          }
+          variant="outline"
+          size="sm"
+        />
+      </div>
       <Tabs defaultValue={defaultTab}>
         <TabsList>
           <TabsTrigger value="users">Users</TabsTrigger>

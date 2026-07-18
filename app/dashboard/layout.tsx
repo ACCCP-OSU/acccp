@@ -1,6 +1,9 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import Link from "next/link";
+import { ShieldUser } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import DashboardBreadcrumb from "@/components/ui/dashboard-breadcrumb";
 import DashboardSidebar from "@/components/ui/dashboard-sidebar";
 import {
@@ -37,6 +40,19 @@ export default async function DashboardLayout({
           <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger />
             <DashboardBreadcrumb />
+            {session.user.role === "admin" && (
+              <Button
+                render={
+                  <Link href="/admin">
+                    <ShieldUser />
+                    Admin
+                  </Link>
+                }
+                variant="outline"
+                size="sm"
+                className="ml-auto"
+              />
+            )}
           </header>
           <div className="flex flex-1 flex-col gap-4 p-4">{children}</div>
         </SidebarInset>
