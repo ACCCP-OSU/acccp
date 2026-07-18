@@ -37,7 +37,7 @@ export default async function AdminPage({
 
   return (
     <main className="flex min-h-full flex-col items-center gap-6 py-12">
-      <div className="w-full max-w-xl">
+      <div className="flex w-full max-w-4xl flex-col gap-6">
         <Button
           render={
             <Link href="/dashboard">
@@ -47,25 +47,26 @@ export default async function AdminPage({
           }
           variant="outline"
           size="sm"
+          className="self-start"
         />
+        <Tabs defaultValue={defaultTab} className="w-full">
+          <TabsList>
+            <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="metrics">Metrics</TabsTrigger>
+          </TabsList>
+          <TabsContent value="users">
+            <PendingUsersTable
+              key={pendingUsers.page}
+              users={pendingUsers.rows}
+              page={pendingUsers.page}
+              totalPages={pendingUsers.totalPages}
+            />
+          </TabsContent>
+          <TabsContent value="metrics">
+            <AdminMetrics jobsPage={jobsPage} />
+          </TabsContent>
+        </Tabs>
       </div>
-      <Tabs defaultValue={defaultTab}>
-        <TabsList>
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="metrics">Metrics</TabsTrigger>
-        </TabsList>
-        <TabsContent value="users">
-          <PendingUsersTable
-            key={pendingUsers.page}
-            users={pendingUsers.rows}
-            page={pendingUsers.page}
-            totalPages={pendingUsers.totalPages}
-          />
-        </TabsContent>
-        <TabsContent value="metrics">
-          <AdminMetrics jobsPage={jobsPage} />
-        </TabsContent>
-      </Tabs>
     </main>
   );
 }
