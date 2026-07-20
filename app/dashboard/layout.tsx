@@ -42,6 +42,7 @@ export default async function DashboardLayout({
             <DashboardBreadcrumb />
             {session.user.role === "admin" && (
               <Button
+                nativeButton={false}
                 render={
                   <Link href="/admin">
                     <ShieldUser />

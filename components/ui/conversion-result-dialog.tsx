@@ -9,6 +9,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "./accordion";
+import { Badge } from "./badge";
 import { Button } from "./button";
 import {
   Dialog,
@@ -18,6 +19,11 @@ import {
   DialogTitle,
 } from "./dialog";
 import type { UploadedDocument } from "@/lib/types/document";
+
+function formatIssueType(type: string): string {
+  const spaced = type.replace(/-/g, " ");
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
 
 interface ConversionResultDialogProps {
   document: UploadedDocument | null;
@@ -65,6 +71,9 @@ export default function ConversionResultDialog({
   const html = document.html ?? fetchedHtml ?? undefined;
   const isSuccess = document.status === "success";
   const isError = document.status === "error";
+  const issues = document.errors ?? [];
+  const errorCount = issues.filter((issue) => issue.severity === "error").length;
+  const warningCount = issues.filter((issue) => issue.severity === "warning").length;
 
   const handleCopy = async () => {
     if (!html) return;
@@ -92,6 +101,20 @@ export default function ConversionResultDialog({
           <DialogDescription>
             Conversion result for this document.
           </DialogDescription>
+          {(errorCount > 0 || warningCount > 0) && (
+            <div className="flex flex-wrap gap-1">
+              {errorCount > 0 && (
+                <Badge variant="destructive">
+                  {errorCount} {errorCount === 1 ? "error" : "errors"}
+                </Badge>
+              )}
+              {warningCount > 0 && (
+                <Badge variant="warning">
+                  {warningCount} {warningCount === 1 ? "warning" : "warnings"}
+                </Badge>
+              )}
+            </div>
+          )}
         </DialogHeader>
 
         <div className="flex items-start gap-2 rounded-2xl border border-primary/30 bg-primary/5 p-3 text-sm">
@@ -129,6 +152,55 @@ export default function ConversionResultDialog({
             </div>
 
             <Accordion>
+              {issues.length > 0 && (
+                <AccordionItem value="issues">
+                  <AccordionTrigger>
+                    View accessibility issues ({issues.length})
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <ul className="flex max-h-64 flex-col gap-3 overflow-auto">
+                      {issues.map((issue, index) => (
+                        <li
+                          key={index}
+                          className="rounded-xl border border-border p-3 text-sm"
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge
+                              variant={
+                                issue.severity === "error"
+                                  ? "destructive"
+                                  : "warning"
+                              }
+                            >
+                              {issue.severity}
+                            </Badge>
+                            <span className="font-medium">
+                              {formatIssueType(issue.type)}
+                            </span>
+                            {issue.wcag && (
+                              <span className="text-xs text-muted-foreground">
+                                {issue.wcag}
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-1">{issue.message}</p>
+                          {issue.element && (
+                            <code className="mt-1 block overflow-auto rounded bg-muted px-2 py-1 text-xs">
+                              {issue.element}
+                            </code>
+                          )}
+                          {issue.suggestion && (
+                            <p className="mt-1 text-muted-foreground">
+                              {issue.suggestion}
+                            </p>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </AccordionContent>
+                </AccordionItem>
+              )}
+
               <AccordionItem value="html-output">
                 <AccordionTrigger>View HTML output</AccordionTrigger>
                 <AccordionContent>

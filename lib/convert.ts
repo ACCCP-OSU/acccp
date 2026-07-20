@@ -20,6 +20,7 @@
  */
 
 import mammoth from "mammoth"
+import * as prettier from "prettier"
 import {
   ACCESSIBILITY_SYSTEM_PROMPT,
   buildUserMessage,
@@ -48,6 +49,8 @@ export interface AccessibilityError {
     | "color-only-meaning"
     | "h1-present"
     | "non-descriptive-link"
+    | "missing-image"
+    | "missing-link"
     | "other"
   severity: "error" | "warning"
   /** Human-readable description of the specific problem */
@@ -140,6 +143,58 @@ async function extractDocx(buffer: Buffer): Promise<{
     .map((m) => m.message)
 
   return { mammothHtml, extractionWarnings }
+}
+
+/**
+ * Extraction warnings come from mammoth reading the raw .docx — they mean a
+ * source image or hyperlink couldn't be read at all. There's nothing the
+ * conversion pipeline can do about content that isn't there, so these are
+ * always warnings, never errors.
+ */
+function classifyExtractionWarning(message: string): AccessibilityError {
+  const lower = message.toLowerCase()
+  if (lower.includes("image")) {
+    return {
+      type: "missing-image",
+      severity: "warning",
+      message,
+      suggestion:
+        "This image could not be read from the source document. Re-add it manually in Canvas.",
+    }
+  }
+  if (lower.includes("hyperlink") || lower.includes("link")) {
+    return {
+      type: "missing-link",
+      severity: "warning",
+      message,
+      suggestion:
+        "This link could not be read from the source document. Re-add it manually in Canvas.",
+    }
+  }
+  return {
+    type: "other",
+    severity: "warning",
+    message,
+    suggestion: "Review the original document manually for this issue.",
+  }
+}
+
+// ─── HTML formatting ──────────────────────────────────────────────────────────
+
+/**
+ * Pretty-prints the AI's single-line HTML output so it's easy to scan in the
+ * review dialog. The AI is explicitly told not to format its own output (see
+ * ACCESSIBILITY_SYSTEM_PROMPT) — this is the formatter it refers to. Falls
+ * back to the unformatted string if the fragment can't be parsed rather than
+ * failing the whole conversion over a cosmetic step.
+ */
+async function formatHtml(html: string): Promise<string> {
+  try {
+    return await prettier.format(html, { parser: "html" })
+  } catch (err) {
+    console.warn("[convert] HTML formatting failed, returning unformatted output:", err)
+    return html
+  }
 }
 
 // ─── Stage 2: AI validation ───────────────────────────────────────────────────
@@ -250,13 +305,23 @@ export async function convertDocx(
       config
     )
     calls.push(await toModelCallUsage("convert", conversionCall, config))
-    const html = conversionCall.content
+    const html = await formatHtml(conversionCall.content)
     const model = conversionCall.model
 
     // Stage 2: validate the output for accessibility issues
     console.log(`[convert] Stage 2: Validating accessibility...`)
-    const { errors, call: validationCall } = await validateWithAI(html, config)
+    const { errors: validationErrors, call: validationCall } = await validateWithAI(
+      html,
+      config
+    )
     calls.push(await toModelCallUsage("validate", validationCall, config))
+
+    // Extraction warnings (missing images/links from the source .docx) are
+    // surfaced through the same errors[] list the frontend renders.
+    const errors = [
+      ...extractionWarnings.map(classifyExtractionWarning),
+      ...validationErrors,
+    ]
 
     const tokensUsed = calls.reduce(
       (sum, c) => sum + c.promptTokens + c.completionTokens,
@@ -320,11 +385,6 @@ if (
       })
     } else {
       console.log("\n── No accessibility issues found ✓")
-    }
-
-    if (result.extractionWarnings.length > 0) {
-      console.log(`\n── Extraction warnings ───────────────────────────────────`)
-      result.extractionWarnings.forEach((w) => console.log(`  • ${w}`))
     }
 
     console.log(`\nModel: ${result.model} | Total tokens: ${result.tokensUsed}`)

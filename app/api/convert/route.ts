@@ -66,6 +66,8 @@ const FINDING_TITLES: Record<AccessibilityError["type"], string> = {
   "color-only-meaning": "Meaning conveyed by colour alone",
   "h1-present": "H1 used inside page content",
   "non-descriptive-link": "Non-descriptive link text",
+  "missing-image": "Image could not be extracted",
+  "missing-link": "Link could not be extracted",
   other: "Accessibility issue",
 };
 

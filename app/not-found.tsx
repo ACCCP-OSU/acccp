@@ -10,7 +10,12 @@ export default function NotFoundPage(): React.JSX.Element {
       <p className="text-muted-foreground">
         If you believe this is an error, please contact a CarmenCanvas administrator.
       </p>
-      <Button render={<Link href="/">Back to login</Link>} size="lg" className="mt-6" />
+      <Button
+        nativeButton={false}
+        render={<Link href="/">Back to login</Link>}
+        size="lg"
+        className="mt-6"
+      />
     </main>
   )
 }

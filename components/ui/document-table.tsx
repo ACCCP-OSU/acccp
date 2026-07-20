@@ -53,6 +53,27 @@ function statusBadge(status: ConversionStatus): React.JSX.Element {
   }
 }
 
+function issueBadges(doc: UploadedDocument): React.JSX.Element | null {
+  if (!doc.errors || doc.errors.length === 0) return null;
+  const errorCount = doc.errors.filter((e) => e.severity === "error").length;
+  const warningCount = doc.errors.filter((e) => e.severity === "warning").length;
+
+  return (
+    <div className="mt-1 flex flex-wrap gap-1">
+      {errorCount > 0 && (
+        <Badge variant="destructive">
+          {errorCount} {errorCount === 1 ? "error" : "errors"}
+        </Badge>
+      )}
+      {warningCount > 0 && (
+        <Badge variant="warning">
+          {warningCount} {warningCount === 1 ? "warning" : "warnings"}
+        </Badge>
+      )}
+    </div>
+  );
+}
+
 export default function DocumentTable({
   documents,
   onToggleLock,
@@ -165,7 +186,10 @@ export default function DocumentTable({
                         <span className="truncate">{doc.name}</span>
                       )}
                     </TableCell>
-                    <TableCell>{statusBadge(doc.status)}</TableCell>
+                    <TableCell>
+                      {statusBadge(doc.status)}
+                      {issueBadges(doc)}
+                    </TableCell>
                     <TableCell>{formatBytes(doc.size)}</TableCell>
                     <TableCell>{formatUploadTime(doc.uploadedAt)}</TableCell>
                     <TableCell>

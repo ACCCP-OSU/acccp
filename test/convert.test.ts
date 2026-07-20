@@ -2,20 +2,36 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { LiteLLMConfig } from "@/lib/litellm";
 
+const convertToHtmlMock = vi
+  .fn()
+  .mockResolvedValue({ value: "<p>Hello world</p>", messages: [] });
+
 vi.mock("mammoth", () => ({
   default: {
-    convertToHtml: vi
-      .fn()
-      .mockResolvedValue({ value: "<p>Hello world</p>", messages: [] }),
+    convertToHtml: convertToHtmlMock,
     images: { imgElement: vi.fn(() => vi.fn()) },
   },
 }));
 
+// Defaults to the real formatter so most tests exercise actual pretty-printing;
+// individual tests can override with mockRejectedValueOnce/mockImplementationOnce.
+const prettierFormatMock = vi.fn();
+vi.mock("prettier", async () => {
+  const actual = await vi.importActual<typeof import("prettier")>("prettier");
+  prettierFormatMock.mockImplementation(actual.format);
+  return {
+    ...actual,
+    format: prettierFormatMock,
+  };
+});
+
 const callLiteLLMMock = vi.fn();
 const fetchModelPricingMock = vi.fn();
 
-vi.mock("./litellm", async () => {
-  const actual = await vi.importActual<typeof import("../lib/litellm")>("./litellm");
+vi.mock("../lib/litellm", async () => {
+  const actual = await vi.importActual<typeof import("../lib/litellm")>(
+    "../lib/litellm",
+  );
   return {
     ...actual,
     callLiteLLM: callLiteLLMMock,
@@ -93,6 +109,10 @@ describe("convertDocx", () => {
   beforeEach(() => {
     callLiteLLMMock.mockReset();
     fetchModelPricingMock.mockReset();
+    convertToHtmlMock.mockResolvedValue({
+      value: "<p>Hello world</p>",
+      messages: [],
+    });
   });
 
   it("returns one calls[] entry per stage whose tokens sum to tokensUsed", async () => {
@@ -149,5 +169,87 @@ describe("convertDocx", () => {
     if (!("error" in result)) throw new Error("expected failure");
     expect(result.calls ?? []).toHaveLength(1);
     expect(result.calls?.[0].stage).toBe("convert");
+  });
+
+  it("classifies missing-image and missing-link extraction warnings as warnings, merged into errors", async () => {
+    convertToHtmlMock.mockResolvedValueOnce({
+      value: "<p>Hello world</p>",
+      messages: [
+        { type: "warning", message: "Could not find image file for image1.png" },
+        { type: "warning", message: "Could not find hyperlink target" },
+        { type: "warning", message: "Unrecognised paragraph style" },
+      ],
+    });
+    callLiteLLMMock
+      .mockResolvedValueOnce({
+        content: "<p>converted</p>",
+        model: "test-model",
+        promptTokens: 100,
+        completionTokens: 50,
+      })
+      .mockResolvedValueOnce({
+        content: '[{"type":"missing-alt","severity":"error","message":"m","suggestion":"s"}]',
+        model: "test-model",
+        promptTokens: 30,
+        completionTokens: 10,
+      });
+    fetchModelPricingMock.mockResolvedValue(null);
+
+    const result = await convertDocx(Buffer.from("fake docx bytes"), "test.docx");
+
+    if ("error" in result) throw new Error(`expected success, got: ${result.error}`);
+
+    expect(result.errors).toEqual([
+      expect.objectContaining({ type: "missing-image", severity: "warning" }),
+      expect.objectContaining({ type: "missing-link", severity: "warning" }),
+      expect.objectContaining({ type: "other", severity: "warning" }),
+      expect.objectContaining({ type: "missing-alt", severity: "error" }),
+    ]);
+  });
+
+  it("pretty-prints the AI's single-line HTML for easier review", async () => {
+    callLiteLLMMock
+      .mockResolvedValueOnce({
+        content: "<div><p>one</p><ul><li>a</li><li>b</li></ul></div>",
+        model: "test-model",
+        promptTokens: 100,
+        completionTokens: 50,
+      })
+      .mockResolvedValueOnce({
+        content: "[]",
+        model: "test-model",
+        promptTokens: 30,
+        completionTokens: 10,
+      });
+    fetchModelPricingMock.mockResolvedValue(null);
+
+    const result = await convertDocx(Buffer.from("fake docx bytes"), "test.docx");
+
+    if ("error" in result) throw new Error(`expected success, got: ${result.error}`);
+    expect(result.html.split("\n").length).toBeGreaterThan(1);
+    expect(result.html).toContain("  <p>one</p>");
+  });
+
+  it("falls back to the unformatted HTML if formatting fails", async () => {
+    prettierFormatMock.mockRejectedValueOnce(new Error("parse error"));
+    callLiteLLMMock
+      .mockResolvedValueOnce({
+        content: "<p>converted</p>",
+        model: "test-model",
+        promptTokens: 100,
+        completionTokens: 50,
+      })
+      .mockResolvedValueOnce({
+        content: "[]",
+        model: "test-model",
+        promptTokens: 30,
+        completionTokens: 10,
+      });
+    fetchModelPricingMock.mockResolvedValue(null);
+
+    const result = await convertDocx(Buffer.from("fake docx bytes"), "test.docx");
+
+    if ("error" in result) throw new Error(`expected success, got: ${result.error}`);
+    expect(result.html).toBe("<p>converted</p>");
   });
 });

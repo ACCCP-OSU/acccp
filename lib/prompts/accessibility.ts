@@ -42,14 +42,13 @@ The input HTML is unpolished — it may have incorrect heading levels, unsemanti
 ## Headings (WCAG 2.4.6, Canvas constraint)
 
 - Canvas pages already have an <h1> page title. NEVER emit <h1>.
-- Map Word styles to HTML headings — this mapping is mandatory, not a suggestion:
-  - Word Heading 1 → <h2>
-  - Word Heading 2 → <h3>
-  - Word Heading 3 → <h4>
-  - Word Heading 4 → <h5>
-  - Word Heading 5 → <h6>
-- The document structure outline provided in the user message tells you which paragraphs are headings and at what level. Use it to assign headings correctly.
-- Never skip heading levels (e.g. h2 → h4 is a violation). If the source skips levels, normalize by promoting the lower heading to the next valid level.
+- The mammoth HTML input already contains the Word document's own heading tags (<h1>–<h6>), at whatever levels Word assigned them. Before writing any output, scan the ENTIRE input for every distinct heading level actually used and list them in ascending order (e.g. the source might only use Word's h1 and h3, never h2).
+- Map that ascending list onto <h2>, <h3>, <h4>, … CONSECUTIVELY, by rank — not by the source's own numbers. The shallowest level used becomes <h2>, the next-shallowest level used becomes <h3>, and so on, with no gaps, regardless of what the source called it.
+  - Example: source uses only h1 and h3 (h2 never appears) → h1 becomes <h2>, h3 becomes <h3>. Do NOT emit <h4> just because the source labeled it "3".
+  - Example: source uses h1, h2, and h3 in full → they become <h2>, <h3>, <h4> respectively, as expected.
+  - Example: source uses h1, h2, h3, and h4 in full → they become <h2>, <h3>, <h4>, <h5> respectively.
+- Apply this same consecutive mapping consistently across the whole document — a given source level must always map to the same output level everywhere it appears.
+- Never skip an output heading level (e.g. <h2> directly to <h4> is always a violation, with no exceptions). Every heading you emit must be at most one level deeper than the nearest preceding heading.
 - Do not use bold paragraphs as a substitute for headings.
 - Do not demote a heading to a <p> tag.
 

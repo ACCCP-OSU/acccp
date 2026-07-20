@@ -1,7 +1,8 @@
 "use server";
 
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 
+import type { AccessibilityError } from "@/lib/convert";
 import { verifyRoleOrRedirect } from "@/lib/auth";
 import { toConversionStatus } from "@/lib/conversion-status";
 import { db } from "@/lib/db";
@@ -10,6 +11,7 @@ import {
   conversionJobs,
   documents,
   sessions,
+  validationFindings,
 } from "@/lib/db/schema";
 import {
   downloadObject,
@@ -35,6 +37,7 @@ export async function listDocuments(sessionId: string): Promise<UploadedDocument
       name: documents.originalFilename,
       size: documents.fileSizeBytes,
       uploadedAt: documents.createdAt,
+      jobId: conversionJobs.id,
       status: conversionJobs.status,
       errorMessage: conversionJobs.errorMessage,
     })
@@ -50,6 +53,37 @@ export async function listDocuments(sessionId: string): Promise<UploadedDocument
     )
     .orderBy(desc(documents.createdAt));
 
+  const jobIds = rows.map((row) => row.jobId).filter((id): id is string => id !== null);
+  const findingsByJobId = new Map<string, AccessibilityError[]>();
+  if (jobIds.length > 0) {
+    const findingRows = await db
+      .select({
+        jobId: validationFindings.jobId,
+        severity: validationFindings.severity,
+        ruleCode: validationFindings.ruleCode,
+        message: validationFindings.message,
+        suggestion: validationFindings.suggestion,
+        wcag: validationFindings.wcag,
+        location: validationFindings.location,
+      })
+      .from(validationFindings)
+      .where(inArray(validationFindings.jobId, jobIds));
+
+    for (const finding of findingRows) {
+      const errors = findingsByJobId.get(finding.jobId) ?? [];
+      const location = finding.location as { element?: string } | null;
+      errors.push({
+        type: (finding.ruleCode as AccessibilityError["type"]) ?? "other",
+        severity: finding.severity === "info" ? "warning" : finding.severity,
+        message: finding.message,
+        suggestion: finding.suggestion ?? "",
+        wcag: finding.wcag ?? undefined,
+        element: location?.element,
+      });
+      findingsByJobId.set(finding.jobId, errors);
+    }
+  }
+
   return rows.map((row) => ({
     id: row.id,
     name: row.name,
@@ -59,6 +93,7 @@ export async function listDocuments(sessionId: string): Promise<UploadedDocument
     // `documents` has no locked column, so the lock resets on reload.
     locked: false,
     errorMessage: row.errorMessage ?? undefined,
+    errors: row.jobId ? findingsByJobId.get(row.jobId) : undefined,
   }));
 }
 

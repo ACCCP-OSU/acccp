@@ -1,3 +1,5 @@
+import type { AccessibilityError } from "@/lib/convert";
+
 export type ConversionStatus =
   | "idle"
   | "queued"
@@ -17,6 +19,8 @@ export interface UploadedDocument {
   locked: boolean;
   html?: string;
   errorMessage?: string;
+  /** Accessibility/parsing issues from the most recent conversion run. */
+  errors?: AccessibilityError[];
   /**
    * The picked file, held only until the server has stored it. Documents loaded
    * from the database have none — their .docx is re-read from storage instead.

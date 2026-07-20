@@ -101,6 +101,7 @@ export default function DocumentWorkspace({
         status: "processing",
         html: undefined,
         errorMessage: undefined,
+        errors: undefined,
       });
 
       try {
@@ -125,6 +126,7 @@ export default function DocumentWorkspace({
           documentId: data.documentId,
           html: data.html,
           errorMessage: undefined,
+          errors: data.errors,
         });
       } catch {
         // An abort means the user navigated away or removed the row.
