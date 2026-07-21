@@ -66,7 +66,10 @@ function makeChain<T>(value: T) {
   (chain as { catch: Function }).catch = (fn: Function) =>
     Promise.resolve(value).catch(fn as never);
 
-  return chain;
+  // Duck-types Drizzle's query builders: `any` satisfies mockReturnValue's
+  // builder types while keeping property access for assertions.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return chain as any;
 }
 
 /** Raw row shape that the listDocuments query returns before mapping. */
