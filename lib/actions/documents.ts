@@ -90,6 +90,7 @@ export async function listDocuments(
 
   return rows.map((row) => ({
     id: row.id,
+    documentId: row.id,
     name: row.name,
     size: row.size,
     uploadedAt: new Date(row.uploadedAt),
