@@ -5,10 +5,11 @@ import { Button } from "@/components/ui/button";
 
 export default function NotFoundPage(): React.JSX.Element {
   return (
-    <main className="flex flex-col items-center justify-center h-screen">
-      <h1 className="text-foreground text-lg font-bold">Page not found.</h1>
+    <main className="flex h-screen flex-col items-center justify-center">
+      <h1 className="text-lg font-bold text-foreground">Page not found.</h1>
       <p className="text-muted-foreground">
-        If you believe this is an error, please contact a CarmenCanvas administrator.
+        If you believe this is an error, please contact a CarmenCanvas
+        administrator.
       </p>
       <Button
         nativeButton={false}
@@ -17,5 +18,5 @@ export default function NotFoundPage(): React.JSX.Element {
         className="mt-6"
       />
     </main>
-  )
+  );
 }

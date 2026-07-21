@@ -19,12 +19,12 @@
  *   LITELLM_MODEL      e.g. gpt-5.4-nano-2026-03-17
  */
 
-import mammoth from "mammoth"
-import * as prettier from "prettier"
+import mammoth from "mammoth";
+import * as prettier from "prettier";
 import {
   ACCESSIBILITY_SYSTEM_PROMPT,
   buildUserMessage,
-} from "./prompts/accessibility"
+} from "./prompts/accessibility";
 import {
   callLiteLLM,
   computeCallCostUsd,
@@ -32,7 +32,7 @@ import {
   getLiteLLMConfig,
   type LiteLLMCallResult,
   type LiteLLMConfig,
-} from "./litellm"
+} from "./litellm";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -51,47 +51,47 @@ export interface AccessibilityError {
     | "non-descriptive-link"
     | "missing-image"
     | "missing-link"
-    | "other"
-  severity: "error" | "warning"
+    | "other";
+  severity: "error" | "warning";
   /** Human-readable description of the specific problem */
-  message: string
+  message: string;
   /** The offending HTML snippet (truncated for display) */
-  element?: string
-  suggestion: string
+  element?: string;
+  suggestion: string;
   /** WCAG criterion this violates, e.g. "WCAG 1.1.1" */
-  wcag?: string
+  wcag?: string;
 }
 
 /** One LiteLLM call's usage, priced from LiteLLM's /model/info at call time. */
 export interface ModelCallUsage {
-  stage: "convert" | "validate"
-  model: string
-  promptTokens: number
-  completionTokens: number
+  stage: "convert" | "validate";
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
   /** Null when pricing couldn't be looked up — tokens are still counted. */
-  costUsd: number | null
+  costUsd: number | null;
 }
 
 /** Returned by convertDocx() on success. */
 export interface ConversionResult {
   /** Accessible HTML fragment, ready to paste into Canvas RCE */
-  html: string
-  errors: AccessibilityError[]
-  model: string
+  html: string;
+  errors: AccessibilityError[];
+  model: string;
   /** Total tokens used across both AI calls */
-  tokensUsed: number
+  tokensUsed: number;
   /** Per-call usage/cost breakdown, for persisting to model_calls */
-  calls: ModelCallUsage[]
+  calls: ModelCallUsage[];
   /** Non-fatal warnings from mammoth during extraction */
-  extractionWarnings: string[]
+  extractionWarnings: string[];
 }
 
 /** Returned by convertDocx() if something goes wrong. */
 export interface ConversionError {
-  error: string
-  detail?: string
+  error: string;
+  detail?: string;
   /** Usage incurred before the failure, if any — still billable. */
-  calls?: ModelCallUsage[]
+  calls?: ModelCallUsage[];
 }
 
 async function toModelCallUsage(
@@ -99,7 +99,7 @@ async function toModelCallUsage(
   call: LiteLLMCallResult,
   config: Pick<LiteLLMConfig, "baseUrl" | "apiKey">
 ): Promise<ModelCallUsage> {
-  const pricing = await fetchModelPricing(call.model, config)
+  const pricing = await fetchModelPricing(call.model, config);
   return {
     stage,
     model: call.model,
@@ -110,7 +110,7 @@ async function toModelCallUsage(
       call.completionTokens,
       pricing
     ),
-  }
+  };
 }
 
 // ─── Stage 1: DOCX extraction ─────────────────────────────────────────────────
@@ -122,27 +122,27 @@ async function toModelCallUsage(
  * instead of embedding raw base64 data.
  */
 async function extractDocx(buffer: Buffer): Promise<{
-  mammothHtml: string
-  extractionWarnings: string[]
+  mammothHtml: string;
+  extractionWarnings: string[];
 }> {
-  let imageIndex = 0
+  let imageIndex = 0;
 
   const { value: mammothHtml, messages } = await mammoth.convertToHtml(
     { buffer },
     {
       convertImage: mammoth.images.imgElement(async (image) => {
-        const ext = image.contentType?.split("/")[1] ?? "png"
-        const name = `image${++imageIndex}.${ext}`
-        return { src: `{{PLACEHOLDER:${name}}}` }
+        const ext = image.contentType?.split("/")[1] ?? "png";
+        const name = `image${++imageIndex}.${ext}`;
+        return { src: `{{PLACEHOLDER:${name}}}` };
       }),
     }
-  )
+  );
 
   const extractionWarnings = messages
     .filter((m) => m.type === "warning")
-    .map((m) => m.message)
+    .map((m) => m.message);
 
-  return { mammothHtml, extractionWarnings }
+  return { mammothHtml, extractionWarnings };
 }
 
 /**
@@ -152,7 +152,7 @@ async function extractDocx(buffer: Buffer): Promise<{
  * always warnings, never errors.
  */
 function classifyExtractionWarning(message: string): AccessibilityError {
-  const lower = message.toLowerCase()
+  const lower = message.toLowerCase();
   if (lower.includes("image")) {
     return {
       type: "missing-image",
@@ -160,7 +160,7 @@ function classifyExtractionWarning(message: string): AccessibilityError {
       message,
       suggestion:
         "This image could not be read from the source document. Re-add it manually in Canvas.",
-    }
+    };
   }
   if (lower.includes("hyperlink") || lower.includes("link")) {
     return {
@@ -169,14 +169,14 @@ function classifyExtractionWarning(message: string): AccessibilityError {
       message,
       suggestion:
         "This link could not be read from the source document. Re-add it manually in Canvas.",
-    }
+    };
   }
   return {
     type: "other",
     severity: "warning",
     message,
     suggestion: "Review the original document manually for this issue.",
-  }
+  };
 }
 
 // ─── HTML formatting ──────────────────────────────────────────────────────────
@@ -190,10 +190,13 @@ function classifyExtractionWarning(message: string): AccessibilityError {
  */
 async function formatHtml(html: string): Promise<string> {
   try {
-    return await prettier.format(html, { parser: "html" })
+    return await prettier.format(html, { parser: "html" });
   } catch (err) {
-    console.warn("[convert] HTML formatting failed, returning unformatted output:", err)
-    return html
+    console.warn(
+      "[convert] HTML formatting failed, returning unformatted output:",
+      err
+    );
+    return html;
   }
 }
 
@@ -240,19 +243,19 @@ Review the HTML for violations of WCAG 2.1 AA and Canvas LMS constraints. For ev
 - Be specific in every message — name the actual content, not just the rule.
 - If the same issue type appears multiple times, create a separate object for each instance.
 - Do not invent issues that are not present in the HTML.
-`
+`;
 
 export async function validateWithAI(
   html: string,
   config: LiteLLMConfig
 ): Promise<{ errors: AccessibilityError[]; call: LiteLLMCallResult }> {
-  const userMessage = `Please audit the following Canvas HTML fragment for accessibility issues:\n\n${html}`
+  const userMessage = `Please audit the following Canvas HTML fragment for accessibility issues:\n\n${html}`;
 
-  const call = await callLiteLLM(VALIDATION_SYSTEM_PROMPT, userMessage, config)
+  const call = await callLiteLLM(VALIDATION_SYSTEM_PROMPT, userMessage, config);
 
   try {
-    const errors = JSON.parse(call.content) as AccessibilityError[]
-    return { errors: Array.isArray(errors) ? errors : [], call }
+    const errors = JSON.parse(call.content) as AccessibilityError[];
+    return { errors: Array.isArray(errors) ? errors : [], call };
   } catch {
     // If the AI returns malformed JSON, surface it as a single warning
     return {
@@ -265,7 +268,7 @@ export async function validateWithAI(
         },
       ],
       call,
-    }
+    };
   }
 }
 
@@ -282,53 +285,53 @@ export async function convertDocx(
   buffer: Buffer,
   filename: string
 ): Promise<ConversionResult | ConversionError> {
-  const calls: ModelCallUsage[] = []
+  const calls: ModelCallUsage[] = [];
   try {
-    const config = getLiteLLMConfig()
+    const config = getLiteLLMConfig();
 
     // Stage 1: extract HTML from the .docx
-    console.log(`[convert] Extracting: ${filename}`)
-    const { mammothHtml, extractionWarnings } = await extractDocx(buffer)
+    console.log(`[convert] Extracting: ${filename}`);
+    const { mammothHtml, extractionWarnings } = await extractDocx(buffer);
 
     if (!mammothHtml.trim()) {
       return {
         error: "Document appears to be empty or contains no extractable text.",
-      }
+      };
     }
 
     // Stage 1: convert to accessible Canvas HTML
-    const userMessage = buildUserMessage(mammothHtml)
-    console.log(`[convert] Stage 1: Converting to HTML...`)
+    const userMessage = buildUserMessage(mammothHtml);
+    console.log(`[convert] Stage 1: Converting to HTML...`);
     const conversionCall = await callLiteLLM(
       ACCESSIBILITY_SYSTEM_PROMPT,
       userMessage,
       config
-    )
-    calls.push(await toModelCallUsage("convert", conversionCall, config))
-    const html = await formatHtml(conversionCall.content)
-    const model = conversionCall.model
+    );
+    calls.push(await toModelCallUsage("convert", conversionCall, config));
+    const html = await formatHtml(conversionCall.content);
+    const model = conversionCall.model;
 
     // Stage 2: validate the output for accessibility issues
-    console.log(`[convert] Stage 2: Validating accessibility...`)
-    const { errors: validationErrors, call: validationCall } = await validateWithAI(
-      html,
-      config
-    )
-    calls.push(await toModelCallUsage("validate", validationCall, config))
+    console.log(`[convert] Stage 2: Validating accessibility...`);
+    const { errors: validationErrors, call: validationCall } =
+      await validateWithAI(html, config);
+    calls.push(await toModelCallUsage("validate", validationCall, config));
 
     // Extraction warnings (missing images/links from the source .docx) are
     // surfaced through the same errors[] list the frontend renders.
     const errors = [
       ...extractionWarnings.map(classifyExtractionWarning),
       ...validationErrors,
-    ]
+    ];
 
     const tokensUsed = calls.reduce(
       (sum, c) => sum + c.promptTokens + c.completionTokens,
       0
-    )
+    );
 
-    console.log(`[convert] Done. ${errors.length} issue(s) found. Tokens: ${tokensUsed}`)
+    console.log(
+      `[convert] Done. ${errors.length} issue(s) found. Tokens: ${tokensUsed}`
+    );
 
     return {
       html,
@@ -337,10 +340,10 @@ export async function convertDocx(
       tokensUsed,
       calls,
       extractionWarnings,
-    }
+    };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    return { error: "Conversion failed", detail: message, calls }
+    const message = err instanceof Error ? err.message : String(err);
+    return { error: "Conversion failed", detail: message, calls };
   }
 }
 
@@ -351,42 +354,48 @@ if (
   process.argv[1]?.endsWith("convert.ts") ||
   process.argv[1]?.endsWith("convert.js")
 ) {
-  const filePath = process.argv[2]
+  const filePath = process.argv[2];
   if (!filePath) {
-    console.error("Usage: npx tsx lib/convert.ts <path-to-docx>")
-    process.exit(1)
+    console.error("Usage: npx tsx lib/convert.ts <path-to-docx>");
+    process.exit(1);
   }
 
-  ;(async () => {
-    const fs = await import("fs/promises")
-    const path = await import("path")
-    const buffer = Buffer.from(await fs.readFile(filePath))
-    const filename = path.basename(filePath)
+  (async () => {
+    const fs = await import("fs/promises");
+    const path = await import("path");
+    const buffer = Buffer.from(await fs.readFile(filePath));
+    const filename = path.basename(filePath);
 
-    console.log(`\nConverting: ${filename}\n`)
-    const result = await convertDocx(buffer, filename)
+    console.log(`\nConverting: ${filename}\n`);
+    const result = await convertDocx(buffer, filename);
 
     if ("error" in result) {
-      console.error("Error:", result.error, result.detail ?? "")
-      process.exit(1)
+      console.error("Error:", result.error, result.detail ?? "");
+      process.exit(1);
     }
 
-    console.log(`\n── HTML output (${result.html.length} chars) ──────────────`)
-    console.log(result.html)
+    console.log(
+      `\n── HTML output (${result.html.length} chars) ──────────────`
+    );
+    console.log(result.html);
 
     if (result.errors.length > 0) {
-      console.log(`\n── Accessibility issues (${result.errors.length}) ────────`)
+      console.log(
+        `\n── Accessibility issues (${result.errors.length}) ────────`
+      );
       result.errors.forEach((e, i) => {
-        console.log(`\n${i + 1}. [${e.severity.toUpperCase()}] ${e.type}`)
-        console.log(`   ${e.message}`)
-        if (e.element) console.log(`   Element: ${e.element}`)
-        console.log(`   Fix: ${e.suggestion}`)
-        if (e.wcag) console.log(`   ${e.wcag}`)
-      })
+        console.log(`\n${i + 1}. [${e.severity.toUpperCase()}] ${e.type}`);
+        console.log(`   ${e.message}`);
+        if (e.element) console.log(`   Element: ${e.element}`);
+        console.log(`   Fix: ${e.suggestion}`);
+        if (e.wcag) console.log(`   ${e.wcag}`);
+      });
     } else {
-      console.log("\n── No accessibility issues found ✓")
+      console.log("\n── No accessibility issues found ✓");
     }
 
-    console.log(`\nModel: ${result.model} | Total tokens: ${result.tokensUsed}`)
-  })()
+    console.log(
+      `\nModel: ${result.model} | Total tokens: ${result.tokensUsed}`
+    );
+  })();
 }

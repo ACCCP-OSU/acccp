@@ -87,14 +87,16 @@ export default function RenameDialog({
                 }
               }}
               aria-invalid={error !== null}
-              aria-describedby={error ? `session-title-error-${session.id}` : undefined}
+              aria-describedby={
+                error ? `session-title-error-${session.id}` : undefined
+              }
               autoFocus
             />
             {error && (
               <p
                 id={`session-title-error-${session.id}`}
                 role="alert"
-                className="text-destructive text-sm"
+                className="text-sm text-destructive"
               >
                 {error}
               </p>
@@ -102,7 +104,9 @@ export default function RenameDialog({
           </Field>
         </FieldGroup>
         <DialogFooter>
-          <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
+          <DialogClose render={<Button variant="outline" />}>
+            Cancel
+          </DialogClose>
           <Button onClick={() => void handleRename()} disabled={isSaving}>
             {isSaving ? "Renaming..." : "Rename"}
           </Button>

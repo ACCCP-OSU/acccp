@@ -12,9 +12,7 @@ import {
 export default function ApplicationUsage(): React.JSX.Element {
   return (
     <Dialog>
-      <DialogTrigger render={<Button size="lg" />}>
-        Usage
-      </DialogTrigger>
+      <DialogTrigger render={<Button size="lg" />}>Usage</DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Usage</DialogTitle>

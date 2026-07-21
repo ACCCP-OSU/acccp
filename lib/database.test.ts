@@ -55,7 +55,9 @@ describe("Connection handling — isUniqueViolation", () => {
   });
 
   it("returns true when the Postgres code is on cause (Drizzle wraps driver errors)", () => {
-    const cause = Object.assign(new Error("unique_violation"), { code: "23505" });
+    const cause = Object.assign(new Error("unique_violation"), {
+      code: "23505",
+    });
     const wrapped = Object.assign(new Error("DrizzleQueryError"), { cause });
     expect(isUniqueViolation(wrapped)).toBe(true);
   });
@@ -72,7 +74,9 @@ describe("Connection handling — isUniqueViolation", () => {
   });
 
   it("returns false for a different Postgres error code", () => {
-    const err = Object.assign(new Error("not null violation"), { code: "23502" });
+    const err = Object.assign(new Error("not null violation"), {
+      code: "23502",
+    });
     expect(isUniqueViolation(err)).toBe(false);
   });
 
@@ -106,7 +110,7 @@ describe("Schema integrity — enums", () => {
         "failed",
         "expired",
         "cancelled",
-      ]),
+      ])
     );
   });
 
@@ -126,12 +130,16 @@ describe("Schema integrity — enums", () => {
         "html_output",
         "validation_report",
         "review_metadata",
-      ]),
+      ])
     );
   });
 
   it("artifactStatus defines available, expired, and deleted", () => {
-    expect(artifactStatus.enumValues).toEqual(["available", "expired", "deleted"]);
+    expect(artifactStatus.enumValues).toEqual([
+      "available",
+      "expired",
+      "deleted",
+    ]);
   });
 
   it("findingSeverity defines info, warning, and error", () => {
@@ -161,14 +169,27 @@ describe("Schema integrity — tables", () => {
   it("users table has id, email, displayName, role, and timestamp columns", () => {
     const cols = Object.keys(users);
     expect(cols).toEqual(
-      expect.arrayContaining(["id", "email", "displayName", "role", "createdAt", "updatedAt"]),
+      expect.arrayContaining([
+        "id",
+        "email",
+        "displayName",
+        "role",
+        "createdAt",
+        "updatedAt",
+      ])
     );
   });
 
   it("sessions table has ownerUserId and title columns", () => {
     const cols = Object.keys(sessions);
     expect(cols).toEqual(
-      expect.arrayContaining(["id", "ownerUserId", "title", "createdAt", "updatedAt"]),
+      expect.arrayContaining([
+        "id",
+        "ownerUserId",
+        "title",
+        "createdAt",
+        "updatedAt",
+      ])
     );
   });
 
@@ -182,7 +203,7 @@ describe("Schema integrity — tables", () => {
         "originalFilename",
         "fileSizeBytes",
         "deletedAt",
-      ]),
+      ])
     );
   });
 
@@ -197,7 +218,7 @@ describe("Schema integrity — tables", () => {
         "reviewStatus",
         "expiresAt",
         "attemptCount",
-      ]),
+      ])
     );
   });
 
@@ -212,7 +233,7 @@ describe("Schema integrity — tables", () => {
         "storageKey",
         "fileSizeBytes",
         "expiresAt",
-      ]),
+      ])
     );
   });
 
@@ -228,7 +249,7 @@ describe("Schema integrity — tables", () => {
         "message",
         "suggestion",
         "wcag",
-      ]),
+      ])
     );
   });
 
@@ -243,7 +264,7 @@ describe("Schema integrity — tables", () => {
         "promptTokens",
         "completionTokens",
         "costUsd",
-      ]),
+      ])
     );
   });
 });

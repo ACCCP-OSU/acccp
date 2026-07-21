@@ -5,10 +5,20 @@ import {
   getUserRoleCounts,
   listRecentJobs,
 } from "@/lib/actions/admin-metrics";
-import { fetchModelPricing, getLiteLLMConfig, type ModelPricing } from "@/lib/litellm";
+import {
+  fetchModelPricing,
+  getLiteLLMConfig,
+  type ModelPricing,
+} from "@/lib/litellm";
 import AdminTablePagination from "./admin-table-pagination";
 import { Badge } from "./badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./card";
 import {
   Table,
   TableBody,
@@ -58,9 +68,10 @@ function formatDate(value: string): string {
 }
 
 /** Live pricing is best-effort — LiteLLM being unreachable shouldn't break the tab. */
-async function getCurrentModelPricing(): Promise<
-  { model: string; pricing: ModelPricing } | null
-> {
+async function getCurrentModelPricing(): Promise<{
+  model: string;
+  pricing: ModelPricing;
+} | null> {
   try {
     const config = getLiteLLMConfig();
     const pricing = await fetchModelPricing(config.model, config);
@@ -73,15 +84,21 @@ async function getCurrentModelPricing(): Promise<
 export default async function AdminMetrics({
   jobsPage,
 }: AdminMetricsProps): Promise<React.JSX.Element> {
-  const [roleCounts, jobStatus, tokenUsage, costSummary, recentJobs, currentPricing] =
-    await Promise.all([
-      getUserRoleCounts(),
-      getJobStatusSummary(),
-      getTokenUsage(30),
-      getCostSummary(30),
-      listRecentJobs(jobsPage),
-      getCurrentModelPricing(),
-    ]);
+  const [
+    roleCounts,
+    jobStatus,
+    tokenUsage,
+    costSummary,
+    recentJobs,
+    currentPricing,
+  ] = await Promise.all([
+    getUserRoleCounts(),
+    getJobStatusSummary(),
+    getTokenUsage(30),
+    getCostSummary(30),
+    listRecentJobs(jobsPage),
+    getCurrentModelPricing(),
+  ]);
 
   return (
     <div className="flex w-full max-w-4xl flex-col gap-6">
@@ -103,7 +120,11 @@ export default async function AdminMetrics({
           </CardHeader>
           <CardContent className="text-muted-foreground">
             {jobStatus.success.count} succeeded ·{" "}
-            <span className={jobStatus.error.count > 0 ? "text-destructive" : undefined}>
+            <span
+              className={
+                jobStatus.error.count > 0 ? "text-destructive" : undefined
+              }
+            >
               {jobStatus.error.count} errored ({jobStatus.error.pct}%)
             </span>{" "}
             of {jobStatus.total} total
@@ -155,7 +176,9 @@ export default async function AdminMetrics({
                 <TableCell>{row.filename}</TableCell>
                 <TableCell>{row.requestedByEmail}</TableCell>
                 <TableCell>
-                  <Badge variant={STATUS_BADGE_VARIANT[row.status] ?? "outline"}>
+                  <Badge
+                    variant={STATUS_BADGE_VARIANT[row.status] ?? "outline"}
+                  >
                     {row.status}
                   </Badge>
                 </TableCell>

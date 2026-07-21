@@ -17,7 +17,11 @@ import {
   getLiteLLMConfig,
 } from "./litellm";
 
-const CONFIG = { baseUrl: "https://litellm.test", apiKey: "test-key", model: "test-model" };
+const CONFIG = {
+  baseUrl: "https://litellm.test",
+  apiKey: "test-key",
+  model: "test-model",
+};
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -76,7 +80,7 @@ describe("AI & LiteLLM connection", () => {
         choices: [{ message: { content: "ok" } }],
         model: "test-model",
         usage: { prompt_tokens: 1, completion_tokens: 1 },
-      }),
+      })
     );
     vi.stubGlobal("fetch", fetchMock);
 
@@ -84,7 +88,7 @@ describe("AI & LiteLLM connection", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "https://litellm.test/chat/completions",
-      expect.objectContaining({ method: "POST" }),
+      expect.objectContaining({ method: "POST" })
     );
   });
 
@@ -93,7 +97,7 @@ describe("AI & LiteLLM connection", () => {
       jsonResponse({
         choices: [{ message: { content: "ok" } }],
         model: "test-model",
-      }),
+      })
     );
     vi.stubGlobal("fetch", fetchMock);
 
@@ -101,7 +105,7 @@ describe("AI & LiteLLM connection", () => {
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect((init.headers as Record<string, string>)["Authorization"]).toBe(
-      "Bearer test-key",
+      "Bearer test-key"
     );
   });
 
@@ -116,7 +120,7 @@ describe("AI & LiteLLM connection", () => {
       "https://litellm.test/model/info",
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: "Bearer test-key" }),
-      }),
+      })
     );
   });
 });
@@ -136,8 +140,8 @@ describe("Response validation", () => {
           choices: [{ message: { content: "  <p>hi</p>  " } }],
           model: "gpt-5.4-nano-2026-03-17",
           usage: { prompt_tokens: 120, completion_tokens: 40 },
-        }),
-      ),
+        })
+      )
     );
 
     const result = await callLiteLLM("system", "user", CONFIG);
@@ -157,8 +161,8 @@ describe("Response validation", () => {
         jsonResponse({
           choices: [{ message: { content: "ok" } }],
           model: "some-model",
-        }),
-      ),
+        })
+      )
     );
 
     const result = await callLiteLLM("system", "user", CONFIG);
@@ -182,8 +186,8 @@ describe("Response validation", () => {
               },
             },
           ],
-        }),
-      ),
+        })
+      )
     );
 
     const pricing = await fetchModelPricing("gpt-5.4-nano-2026-03-17", CONFIG);
@@ -210,8 +214,8 @@ describe("Response validation", () => {
               },
             },
           ],
-        }),
-      ),
+        })
+      )
     );
 
     const pricing = await fetchModelPricing("gpt-5.4-nano-2026-03-17", CONFIG);
@@ -241,7 +245,7 @@ describe("Response validation", () => {
             model_info: { input_cost_per_token: 1, output_cost_per_token: 2 },
           },
         ],
-      }),
+      })
     );
     vi.stubGlobal("fetch", fetchMock);
 
@@ -263,22 +267,26 @@ describe("Error handling", () => {
   it("callLiteLLM throws with the HTTP status and body on a non-2xx response", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(new Response("Internal Server Error", { status: 500 })),
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response("Internal Server Error", { status: 500 })
+        )
     );
 
-    await expect(
-      callLiteLLM("system", "user", CONFIG),
-    ).rejects.toThrow(/LiteLLM error 500/);
+    await expect(callLiteLLM("system", "user", CONFIG)).rejects.toThrow(
+      /LiteLLM error 500/
+    );
   });
 
   it("callLiteLLM throws on a 401 Unauthorized response", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(new Response("Unauthorized", { status: 401 })),
+      vi.fn().mockResolvedValue(new Response("Unauthorized", { status: 401 }))
     );
 
     await expect(callLiteLLM("system", "user", CONFIG)).rejects.toThrow(
-      /LiteLLM error 401/,
+      /LiteLLM error 401/
     );
   });
 
@@ -289,16 +297,21 @@ describe("Error handling", () => {
   it("fetchModelPricing returns null (not throw) when the model has no cost fields", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        jsonResponse({ data: [{ model_name: "m", model_info: {} }] }),
-      ),
+      vi
+        .fn()
+        .mockResolvedValue(
+          jsonResponse({ data: [{ model_name: "m", model_info: {} }] })
+        )
     );
 
     expect(await fetchModelPricing("m", CONFIG)).toBeNull();
   });
 
   it("fetchModelPricing returns null when no entry matches the requested model", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ data: [] })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(jsonResponse({ data: [] }))
+    );
 
     expect(await fetchModelPricing("unknown-model", CONFIG)).toBeNull();
   });
@@ -306,14 +319,19 @@ describe("Error handling", () => {
   it("fetchModelPricing returns null (not throw) on a non-2xx response", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(new Response("Service Unavailable", { status: 503 })),
+      vi
+        .fn()
+        .mockResolvedValue(new Response("Service Unavailable", { status: 503 }))
     );
 
     expect(await fetchModelPricing("m", CONFIG)).toBeNull();
   });
 
   it("fetchModelPricing returns null (not throw) when the network request fails entirely", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new Error("network down"))
+    );
 
     expect(await fetchModelPricing("m", CONFIG)).toBeNull();
   });

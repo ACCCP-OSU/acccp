@@ -120,8 +120,8 @@ export default function HomePage(): React.JSX.Element {
           <CardHeader className="text-center">
             <CardTitle>Log in to get started</CardTitle>
             <CardDescription>
-              Enter your OSU email below. We&apos;ll send you a one-time code
-              to verify it&apos;s you.
+              Enter your OSU email below. We&apos;ll send you a one-time code to
+              verify it&apos;s you.
             </CardDescription>
           </CardHeader>
           <CardContent>

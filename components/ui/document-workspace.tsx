@@ -16,11 +16,12 @@ export default function DocumentWorkspace({
   sessionId,
   initialDocuments,
 }: DocumentWorkspaceProps): React.JSX.Element {
-  const [documents, setDocuments] = useState<UploadedDocument[]>(initialDocuments);
+  const [documents, setDocuments] =
+    useState<UploadedDocument[]>(initialDocuments);
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
 
   const isProcessing = documents.some(
-    (doc) => doc.status === "processing" || doc.status === "queued",
+    (doc) => doc.status === "processing" || doc.status === "queued"
   );
   const hasDocuments = documents.length > 0;
   const canConvert = hasDocuments && !isProcessing;
@@ -36,10 +37,10 @@ export default function DocumentWorkspace({
   const updateDocument = useCallback(
     (docId: string, patch: Partial<UploadedDocument>) => {
       setDocuments((prev) =>
-        prev.map((doc) => (doc.id === docId ? { ...doc, ...patch } : doc)),
+        prev.map((doc) => (doc.id === docId ? { ...doc, ...patch } : doc))
       );
     },
-    [],
+    []
   );
 
   const addDocuments = useCallback((files: File[]) => {
@@ -61,8 +62,8 @@ export default function DocumentWorkspace({
   const toggleDocumentLock = useCallback((docId: string) => {
     setDocuments((prev) =>
       prev.map((doc) =>
-        doc.id === docId ? { ...doc, locked: !doc.locked } : doc,
-      ),
+        doc.id === docId ? { ...doc, locked: !doc.locked } : doc
+      )
     );
   }, []);
 
@@ -76,7 +77,7 @@ export default function DocumentWorkspace({
 
       if (doc?.documentId) await deleteDocument(doc.documentId);
     },
-    [documents],
+    [documents]
   );
 
   const convertDocument = useCallback(
@@ -140,7 +141,7 @@ export default function DocumentWorkspace({
         abortControllersRef.current.delete(doc.id);
       }
     },
-    [sessionId, updateDocument],
+    [sessionId, updateDocument]
   );
 
   const runConversion = useCallback(() => {
@@ -157,7 +158,9 @@ export default function DocumentWorkspace({
   return (
     <div className="mt-8 flex flex-col gap-6">
       <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium text-foreground">Upload documents</h2>
+        <h2 className="text-sm font-medium text-foreground">
+          Upload documents
+        </h2>
         <FileUpload onFilesSelected={addDocuments} disabled={isProcessing} />
       </section>
 

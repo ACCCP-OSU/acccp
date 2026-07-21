@@ -84,7 +84,10 @@ export async function POST(req: NextRequest) {
   try {
     formData = await req.formData();
   } catch {
-    return json({ error: "Invalid request. Expected multipart/form-data." }, 400);
+    return json(
+      { error: "Invalid request. Expected multipart/form-data." },
+      400
+    );
   }
 
   const sessionId = formData.get("sessionId");
@@ -100,13 +103,14 @@ export async function POST(req: NextRequest) {
       and(
         eq(sessions.id, sessionId),
         eq(sessions.ownerUserId, userId),
-        isNull(sessions.archivedAt),
-      ),
+        isNull(sessions.archivedAt)
+      )
     );
   if (!session) return json({ error: "Session not found." }, 404);
 
   const existingDocumentId = formData.get("documentId");
-  const isReconversion = typeof existingDocumentId === "string" && existingDocumentId;
+  const isReconversion =
+    typeof existingDocumentId === "string" && existingDocumentId;
 
   let documentId: string;
   let filename: string;
@@ -115,14 +119,17 @@ export async function POST(req: NextRequest) {
   if (isReconversion) {
     // Scoped to the session we just proved the caller owns.
     const [existing] = await db
-      .select({ id: documents.id, originalFilename: documents.originalFilename })
+      .select({
+        id: documents.id,
+        originalFilename: documents.originalFilename,
+      })
       .from(documents)
       .where(
         and(
           eq(documents.id, existingDocumentId),
           eq(documents.sessionId, sessionId),
-          isNull(documents.deletedAt),
-        ),
+          isNull(documents.deletedAt)
+        )
       );
     if (!existing) return json({ error: "Document not found." }, 404);
 
@@ -131,24 +138,34 @@ export async function POST(req: NextRequest) {
     try {
       buffer = await downloadObject(sourceDocxKey(sessionId, documentId));
     } catch (error) {
-      console.error(`[api/convert] document=${documentId} source fetch failed`, error);
+      console.error(
+        `[api/convert] document=${documentId} source fetch failed`,
+        error
+      );
       return json({ error: "Could not read the stored document." }, 500);
     }
   } else {
     const file = formData.get("file");
     if (!file || !(file instanceof File)) {
       return json(
-        { error: "No file provided. Include a .docx file as the 'file' field." },
-        400,
+        {
+          error: "No file provided. Include a .docx file as the 'file' field.",
+        },
+        400
       );
     }
     if (!file.name.toLowerCase().endsWith(".docx")) {
-      return json({ error: "Invalid file type. Only .docx files are supported." }, 415);
+      return json(
+        { error: "Invalid file type. Only .docx files are supported." },
+        415
+      );
     }
     if (file.size > MAX_FILE_SIZE_BYTES) {
       return json(
-        { error: `File too large. Maximum size is ${MAX_FILE_SIZE_BYTES / 1024 / 1024} MB.` },
-        413,
+        {
+          error: `File too large. Maximum size is ${MAX_FILE_SIZE_BYTES / 1024 / 1024} MB.`,
+        },
+        413
       );
     }
 
@@ -169,10 +186,17 @@ export async function POST(req: NextRequest) {
 
     // The row is useless without its blob, so don't leave one behind.
     try {
-      await uploadObject(sourceDocxKey(sessionId, documentId), buffer, DOCX_MIME_TYPE);
+      await uploadObject(
+        sourceDocxKey(sessionId, documentId),
+        buffer,
+        DOCX_MIME_TYPE
+      );
     } catch (error) {
       await db.delete(documents).where(eq(documents.id, documentId));
-      console.error(`[api/convert] document=${documentId} upload failed`, error);
+      console.error(
+        `[api/convert] document=${documentId} upload failed`,
+        error
+      );
       return json({ error: "Could not store the uploaded document." }, 500);
     }
   }
@@ -240,13 +264,16 @@ export async function POST(req: NextRequest) {
             promptTokens: call.promptTokens,
             completionTokens: call.completionTokens,
             costUsd: call.costUsd !== null ? String(call.costUsd) : null,
-          })),
+          }))
         );
       }
     });
 
     console.error(`[api/convert] job=${jobId} failed: ${result.error}`);
-    return json({ error: result.error, detail: result.detail, jobId, documentId }, 500);
+    return json(
+      { error: result.error, detail: result.detail, jobId, documentId },
+      500
+    );
   }
 
   const htmlKey = htmlOutputKey(sessionId, documentId);
@@ -307,7 +334,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Findings have no natural key, so replace the previous run's wholesale.
-    await tx.delete(validationFindings).where(eq(validationFindings.jobId, jobId));
+    await tx
+      .delete(validationFindings)
+      .where(eq(validationFindings.jobId, jobId));
     if (result.errors.length > 0) {
       await tx.insert(validationFindings).values(
         result.errors.map((issue) => ({
@@ -319,7 +348,7 @@ export async function POST(req: NextRequest) {
           suggestion: issue.suggestion,
           wcag: issue.wcag ?? null,
           location: issue.element ? { element: issue.element } : null,
-        })),
+        }))
       );
     }
 
@@ -343,12 +372,12 @@ export async function POST(req: NextRequest) {
         promptTokens: call.promptTokens,
         completionTokens: call.completionTokens,
         costUsd: call.costUsd !== null ? String(call.costUsd) : null,
-      })),
+      }))
     );
   });
 
   console.log(
-    `[api/convert] job=${jobId} completed. errors=${result.errors.length} tokens=${result.tokensUsed}`,
+    `[api/convert] job=${jobId} completed. errors=${result.errors.length} tokens=${result.tokensUsed}`
   );
 
   return NextResponse.json({

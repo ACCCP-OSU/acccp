@@ -85,7 +85,9 @@ type Session = NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>;
  * @param permitted - Roles with permission.
  * @returns The verified session, so callers can read session.user.id.
  */
-export async function verifyRoleOrRedirect(permitted: Role[]): Promise<Session> {
+export async function verifyRoleOrRedirect(
+  permitted: Role[]
+): Promise<Session> {
   const session = await auth.api.getSession({ headers: await headers() });
 
   // Not logged in

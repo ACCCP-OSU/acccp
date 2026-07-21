@@ -40,7 +40,7 @@ export default function ConversionResultDialog({
   // undefined = not fetched yet, null = unavailable. Written only from the
   // async callbacks below, so the effect never sets state synchronously.
   const [fetchedHtml, setFetchedHtml] = useState<string | null | undefined>(
-    undefined,
+    undefined
   );
 
   // Documents restored from the database carry no html — it lives in storage
@@ -72,8 +72,12 @@ export default function ConversionResultDialog({
   const isSuccess = document.status === "success";
   const isError = document.status === "error";
   const issues = document.errors ?? [];
-  const errorCount = issues.filter((issue) => issue.severity === "error").length;
-  const warningCount = issues.filter((issue) => issue.severity === "warning").length;
+  const errorCount = issues.filter(
+    (issue) => issue.severity === "error"
+  ).length;
+  const warningCount = issues.filter(
+    (issue) => issue.severity === "warning"
+  ).length;
 
   const handleCopy = async () => {
     if (!html) return;

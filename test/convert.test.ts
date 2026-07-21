@@ -29,9 +29,8 @@ const callLiteLLMMock = vi.fn();
 const fetchModelPricingMock = vi.fn();
 
 vi.mock("../lib/litellm", async () => {
-  const actual = await vi.importActual<typeof import("../lib/litellm")>(
-    "../lib/litellm",
-  );
+  const actual =
+    await vi.importActual<typeof import("../lib/litellm")>("../lib/litellm");
   return {
     ...actual,
     callLiteLLM: callLiteLLMMock,
@@ -56,7 +55,8 @@ describe("validateWithAI", () => {
 
   it("returns the parsed errors array on valid JSON", async () => {
     callLiteLLMMock.mockResolvedValueOnce({
-      content: '[{"type":"missing-alt","severity":"error","message":"m","suggestion":"s"}]',
+      content:
+        '[{"type":"missing-alt","severity":"error","message":"m","suggestion":"s"}]',
       model: "test-model",
       promptTokens: 10,
       completionTokens: 5,
@@ -134,9 +134,13 @@ describe("convertDocx", () => {
       outputCostPerToken: 0.000004,
     });
 
-    const result = await convertDocx(Buffer.from("fake docx bytes"), "test.docx");
+    const result = await convertDocx(
+      Buffer.from("fake docx bytes"),
+      "test.docx"
+    );
 
-    if ("error" in result) throw new Error(`expected success, got: ${result.error}`);
+    if ("error" in result)
+      throw new Error(`expected success, got: ${result.error}`);
 
     expect(result.calls).toHaveLength(2);
     expect(result.calls[0].stage).toBe("convert");
@@ -144,12 +148,12 @@ describe("convertDocx", () => {
 
     const tokenSum = result.calls.reduce(
       (sum, call) => sum + call.promptTokens + call.completionTokens,
-      0,
+      0
     );
     expect(result.tokensUsed).toBe(tokenSum);
     expect(result.calls[0].costUsd).toBeCloseTo(
       100 * 0.000002 + 50 * 0.000004,
-      10,
+      10
     );
   });
 
@@ -164,7 +168,10 @@ describe("convertDocx", () => {
       .mockRejectedValueOnce(new Error("LiteLLM error 500: boom"));
     fetchModelPricingMock.mockResolvedValue(null);
 
-    const result = await convertDocx(Buffer.from("fake docx bytes"), "test.docx");
+    const result = await convertDocx(
+      Buffer.from("fake docx bytes"),
+      "test.docx"
+    );
 
     if (!("error" in result)) throw new Error("expected failure");
     expect(result.calls ?? []).toHaveLength(1);
@@ -175,7 +182,10 @@ describe("convertDocx", () => {
     convertToHtmlMock.mockResolvedValueOnce({
       value: "<p>Hello world</p>",
       messages: [
-        { type: "warning", message: "Could not find image file for image1.png" },
+        {
+          type: "warning",
+          message: "Could not find image file for image1.png",
+        },
         { type: "warning", message: "Could not find hyperlink target" },
         { type: "warning", message: "Unrecognised paragraph style" },
       ],
@@ -188,16 +198,21 @@ describe("convertDocx", () => {
         completionTokens: 50,
       })
       .mockResolvedValueOnce({
-        content: '[{"type":"missing-alt","severity":"error","message":"m","suggestion":"s"}]',
+        content:
+          '[{"type":"missing-alt","severity":"error","message":"m","suggestion":"s"}]',
         model: "test-model",
         promptTokens: 30,
         completionTokens: 10,
       });
     fetchModelPricingMock.mockResolvedValue(null);
 
-    const result = await convertDocx(Buffer.from("fake docx bytes"), "test.docx");
+    const result = await convertDocx(
+      Buffer.from("fake docx bytes"),
+      "test.docx"
+    );
 
-    if ("error" in result) throw new Error(`expected success, got: ${result.error}`);
+    if ("error" in result)
+      throw new Error(`expected success, got: ${result.error}`);
 
     expect(result.errors).toEqual([
       expect.objectContaining({ type: "missing-image", severity: "warning" }),
@@ -223,9 +238,13 @@ describe("convertDocx", () => {
       });
     fetchModelPricingMock.mockResolvedValue(null);
 
-    const result = await convertDocx(Buffer.from("fake docx bytes"), "test.docx");
+    const result = await convertDocx(
+      Buffer.from("fake docx bytes"),
+      "test.docx"
+    );
 
-    if ("error" in result) throw new Error(`expected success, got: ${result.error}`);
+    if ("error" in result)
+      throw new Error(`expected success, got: ${result.error}`);
     expect(result.html.split("\n").length).toBeGreaterThan(1);
     expect(result.html).toContain("  <p>one</p>");
   });
@@ -247,9 +266,13 @@ describe("convertDocx", () => {
       });
     fetchModelPricingMock.mockResolvedValue(null);
 
-    const result = await convertDocx(Buffer.from("fake docx bytes"), "test.docx");
+    const result = await convertDocx(
+      Buffer.from("fake docx bytes"),
+      "test.docx"
+    );
 
-    if ("error" in result) throw new Error(`expected success, got: ${result.error}`);
+    if ("error" in result)
+      throw new Error(`expected success, got: ${result.error}`);
     expect(result.html).toBe("<p>converted</p>");
   });
 });

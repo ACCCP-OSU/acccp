@@ -65,7 +65,7 @@ describe("getUserRoleCounts", () => {
         { role: "pending", count: 3 },
         { role: "instructor", count: 10 },
         { role: "admin", count: 2 },
-      ]),
+      ])
     );
 
     expect(await getUserRoleCounts()).toEqual({
@@ -77,18 +77,26 @@ describe("getUserRoleCounts", () => {
 
   it("defaults missing roles to 0 when no users exist for that role", async () => {
     vi.mocked(db.select).mockReturnValue(
-      makeChain([{ role: "admin", count: 1 }]),
+      makeChain([{ role: "admin", count: 1 }])
     );
 
-    expect(await getUserRoleCounts()).toEqual({ pending: 0, instructor: 0, admin: 1 });
+    expect(await getUserRoleCounts()).toEqual({
+      pending: 0,
+      instructor: 0,
+      admin: 1,
+    });
   });
 
   it("ignores unknown role values returned by the DB", async () => {
     vi.mocked(db.select).mockReturnValue(
-      makeChain([{ role: "super_admin", count: 99 }]),
+      makeChain([{ role: "super_admin", count: 99 }])
     );
 
-    expect(await getUserRoleCounts()).toEqual({ pending: 0, instructor: 0, admin: 0 });
+    expect(await getUserRoleCounts()).toEqual({
+      pending: 0,
+      instructor: 0,
+      admin: 0,
+    });
   });
 
   it("requires admin role", async () => {
@@ -99,7 +107,7 @@ describe("getUserRoleCounts", () => {
 
   it("propagates a redirect thrown by the auth check", async () => {
     vi.mocked(verifyRoleOrRedirect).mockRejectedValueOnce(
-      new Error("NEXT_REDIRECT"),
+      new Error("NEXT_REDIRECT")
     );
     await expect(getUserRoleCounts()).rejects.toThrow("NEXT_REDIRECT");
   });
@@ -115,7 +123,7 @@ describe("getJobStatusSummary", () => {
       makeChain([
         { status: "completed", count: 8 },
         { status: "failed", count: 2 },
-      ]),
+      ])
     );
 
     const result = await getJobStatusSummary();
@@ -139,7 +147,7 @@ describe("getJobStatusSummary", () => {
 
   it("counts needs_review as success (HTML is available)", async () => {
     vi.mocked(db.select).mockReturnValue(
-      makeChain([{ status: "needs_review", count: 5 }]),
+      makeChain([{ status: "needs_review", count: 5 }])
     );
 
     const result = await getJobStatusSummary();
@@ -153,7 +161,7 @@ describe("getJobStatusSummary", () => {
       makeChain([
         { status: "expired", count: 3 },
         { status: "cancelled", count: 1 },
-      ]),
+      ])
     );
 
     const result = await getJobStatusSummary();
@@ -167,7 +175,7 @@ describe("getJobStatusSummary", () => {
       makeChain([
         { status: "queued", count: 5 },
         { status: "processing", count: 5 },
-      ]),
+      ])
     );
 
     const result = await getJobStatusSummary();
@@ -232,7 +240,7 @@ describe("getCostSummary", () => {
 
   it("returns both window and all-time costs when data exists", async () => {
     vi.mocked(db.select)
-      .mockReturnValueOnce(makeChain([{ cost: "12.5" }]))    // window
+      .mockReturnValueOnce(makeChain([{ cost: "12.5" }])) // window
       .mockReturnValueOnce(makeChain([{ cost: "100.25" }])); // all-time
 
     const result = await getCostSummary(30);
@@ -407,7 +415,7 @@ describe("listPendingUsersPage", () => {
 
   it("propagates a redirect thrown by the auth check", async () => {
     vi.mocked(verifyRoleOrRedirect).mockRejectedValueOnce(
-      new Error("NEXT_REDIRECT"),
+      new Error("NEXT_REDIRECT")
     );
 
     await expect(listPendingUsersPage()).rejects.toThrow("NEXT_REDIRECT");

@@ -22,11 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "./table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "./tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip";
 
 interface DocumentTableProps {
   documents: UploadedDocument[];
@@ -56,7 +52,9 @@ function statusBadge(status: ConversionStatus): React.JSX.Element {
 function issueBadges(doc: UploadedDocument): React.JSX.Element | null {
   if (!doc.errors || doc.errors.length === 0) return null;
   const errorCount = doc.errors.filter((e) => e.severity === "error").length;
-  const warningCount = doc.errors.filter((e) => e.severity === "warning").length;
+  const warningCount = doc.errors.filter(
+    (e) => e.severity === "warning"
+  ).length;
 
   return (
     <div className="mt-1 flex flex-wrap gap-1">
@@ -107,8 +105,9 @@ export default function DocumentTable({
         <CardContent>
           <p className="text-sm text-muted-foreground">
             Drag .docx files onto the dropzone above or click to browse, then
-            click <strong className="font-medium text-foreground">Convert</strong>{" "}
-            to start the conversion process.
+            click{" "}
+            <strong className="font-medium text-foreground">Convert</strong> to
+            start the conversion process.
           </p>
         </CardContent>
       </Card>

@@ -29,7 +29,9 @@ export default function DashboardSidebar(): React.JSX.Element {
     <Sidebar>
       <SidebarHeader>
         <div className="flex items-center gap-2 font-bold">
-          <span className="bg-sidebar-primary text-primary-foreground p-1 rounded-md select-none">O</span>
+          <span className="rounded-md bg-sidebar-primary p-1 text-primary-foreground select-none">
+            O
+          </span>
           <span>ACCCP</span>
         </div>
         <SidebarGroup>

@@ -32,7 +32,7 @@ export async function GET() {
   if (!pricing) {
     return NextResponse.json(
       { error: `No pricing available for model "${config.model}".` },
-      { status: 404 },
+      { status: 404 }
     );
   }
 

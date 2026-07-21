@@ -51,7 +51,10 @@ export const reviewStatus = pgEnum("review_status", [
   "reviewed",
 ]);
 export const userRole = pgEnum("user_role", ["pending", "instructor", "admin"]);
-export const modelCallStage = pgEnum("model_call_stage", ["convert", "validate"]);
+export const modelCallStage = pgEnum("model_call_stage", [
+  "convert",
+  "validate",
+]);
 
 export const users = pgTable(
   "users",
@@ -581,10 +584,7 @@ export const modelCalls = pgTable(
       foreignColumns: [conversionJobs.id],
       name: "model_calls_job_id_fkey",
     }).onDelete("cascade"),
-    check(
-      "model_calls_prompt_tokens_nonnegative_chk",
-      sql`prompt_tokens >= 0`
-    ),
+    check("model_calls_prompt_tokens_nonnegative_chk", sql`prompt_tokens >= 0`),
     check(
       "model_calls_completion_tokens_nonnegative_chk",
       sql`completion_tokens >= 0`

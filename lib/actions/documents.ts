@@ -28,7 +28,9 @@ async function requireUserId(): Promise<string> {
   return session.user.id;
 }
 
-export async function listDocuments(sessionId: string): Promise<UploadedDocument[]> {
+export async function listDocuments(
+  sessionId: string
+): Promise<UploadedDocument[]> {
   const userId = await requireUserId();
 
   const rows = await db
@@ -48,12 +50,14 @@ export async function listDocuments(sessionId: string): Promise<UploadedDocument
       and(
         eq(documents.sessionId, sessionId),
         eq(sessions.ownerUserId, userId),
-        isNull(documents.deletedAt),
-      ),
+        isNull(documents.deletedAt)
+      )
     )
     .orderBy(desc(documents.createdAt));
 
-  const jobIds = rows.map((row) => row.jobId).filter((id): id is string => id !== null);
+  const jobIds = rows
+    .map((row) => row.jobId)
+    .filter((id): id is string => id !== null);
   const findingsByJobId = new Map<string, AccessibilityError[]>();
   if (jobIds.length > 0) {
     const findingRows = await db
@@ -101,7 +105,9 @@ export async function listDocuments(sessionId: string): Promise<UploadedDocument
  * The HTML lives in storage rather than a column, so it is fetched on demand
  * instead of being loaded for every row of the documents table.
  */
-export async function getDocumentHtml(documentId: string): Promise<string | null> {
+export async function getDocumentHtml(
+  documentId: string
+): Promise<string | null> {
   const userId = await requireUserId();
 
   const [row] = await db
@@ -116,8 +122,8 @@ export async function getDocumentHtml(documentId: string): Promise<string | null
         eq(sessions.ownerUserId, userId),
         eq(artifacts.artifactType, "html_output"),
         eq(artifacts.artifactStatus, "available"),
-        isNull(documents.deletedAt),
-      ),
+        isNull(documents.deletedAt)
+      )
     );
 
   if (!row) return null;
@@ -135,8 +141,8 @@ export async function deleteDocument(documentId: string): Promise<void> {
       and(
         eq(documents.id, documentId),
         eq(sessions.ownerUserId, userId),
-        isNull(documents.deletedAt),
-      ),
+        isNull(documents.deletedAt)
+      )
     );
   if (!doc) return;
 

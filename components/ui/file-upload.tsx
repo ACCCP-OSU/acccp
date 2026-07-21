@@ -77,13 +77,13 @@ export default function FileUpload({
         className={cn(
           "flex cursor-pointer flex-col items-center gap-2 rounded-2xl border border-dashed p-8 transition-colors",
           disabled && "pointer-events-none opacity-50",
-          isDragging
-            ? "border-primary bg-muted/50"
-            : "hover:bg-muted",
+          isDragging ? "border-primary bg-muted/50" : "hover:bg-muted"
         )}
       >
         <Upload className="size-8 text-muted-foreground" />
-        <p className="text-sm font-medium">Drop .docx files here or click to browse</p>
+        <p className="text-sm font-medium">
+          Drop .docx files here or click to browse
+        </p>
         <p className="text-xs text-muted-foreground">
           Microsoft Word documents only
         </p>
@@ -100,9 +100,7 @@ export default function FileUpload({
           }}
         />
       </div>
-      {rejectHint && (
-        <p className="text-sm text-destructive">{rejectHint}</p>
-      )}
+      {rejectHint && <p className="text-sm text-destructive">{rejectHint}</p>}
     </div>
   );
 }

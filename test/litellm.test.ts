@@ -42,9 +42,13 @@ describe("callLiteLLM", () => {
         jsonResponse({
           choices: [{ message: { content: "  <p>hi</p>  " } }],
           model: "gpt-5.4-nano-2026-03-17",
-          usage: { prompt_tokens: 120, completion_tokens: 40, total_tokens: 160 },
-        }),
-      ),
+          usage: {
+            prompt_tokens: 120,
+            completion_tokens: 40,
+            total_tokens: 160,
+          },
+        })
+      )
     );
 
     const result = await callLiteLLM("system", "user", {
@@ -67,8 +71,8 @@ describe("callLiteLLM", () => {
         jsonResponse({
           choices: [{ message: { content: "ok" } }],
           model: "some-model",
-        }),
-      ),
+        })
+      )
     );
 
     const result = await callLiteLLM("system", "user", {
@@ -83,11 +87,11 @@ describe("callLiteLLM", () => {
   it("throws with the response body on a non-2xx response", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(new Response("boom", { status: 500 })),
+      vi.fn().mockResolvedValue(new Response("boom", { status: 500 }))
     );
 
     await expect(
-      callLiteLLM("system", "user", { ...CONFIG, model: "m" }),
+      callLiteLLM("system", "user", { ...CONFIG, model: "m" })
     ).rejects.toThrow(/LiteLLM error 500/);
   });
 });
@@ -115,8 +119,8 @@ describe("fetchModelPricing", () => {
               },
             },
           ],
-        }),
-      ),
+        })
+      )
     );
 
     const pricing = await fetchModelPricing("gpt-5.4-nano-2026-03-17", CONFIG);
@@ -141,8 +145,8 @@ describe("fetchModelPricing", () => {
               },
             },
           ],
-        }),
-      ),
+        })
+      )
     );
 
     const pricing = await fetchModelPricing("gpt-5.4-nano-2026-03-17", CONFIG);
@@ -153,16 +157,21 @@ describe("fetchModelPricing", () => {
   });
 
   it("returns null when no entry matches the model", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ data: [] })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(jsonResponse({ data: [] }))
+    );
     expect(await fetchModelPricing("unknown-model", CONFIG)).toBeNull();
   });
 
   it("returns null when model_info is missing cost fields", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        jsonResponse({ data: [{ model_name: "m", model_info: {} }] }),
-      ),
+      vi
+        .fn()
+        .mockResolvedValue(
+          jsonResponse({ data: [{ model_name: "m", model_info: {} }] })
+        )
     );
     expect(await fetchModelPricing("m", CONFIG)).toBeNull();
   });
@@ -170,13 +179,16 @@ describe("fetchModelPricing", () => {
   it("returns null (not throw) on a non-2xx response", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(new Response("nope", { status: 503 })),
+      vi.fn().mockResolvedValue(new Response("nope", { status: 503 }))
     );
     expect(await fetchModelPricing("m", CONFIG)).toBeNull();
   });
 
   it("returns null (not throw) when fetch itself rejects", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new Error("network down"))
+    );
     expect(await fetchModelPricing("m", CONFIG)).toBeNull();
   });
 
@@ -189,7 +201,7 @@ describe("fetchModelPricing", () => {
             model_info: { input_cost_per_token: 1, output_cost_per_token: 2 },
           },
         ],
-      }),
+      })
     );
     vi.stubGlobal("fetch", fetchMock);
 

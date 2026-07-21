@@ -88,7 +88,7 @@ describe("approveUser", () => {
 
   it("rejects before touching the DB when the caller lacks admin role", async () => {
     vi.mocked(verifyRoleOrRedirect).mockRejectedValueOnce(
-      new Error("NEXT_REDIRECT"),
+      new Error("NEXT_REDIRECT")
     );
 
     await expect(approveUser("user-42")).rejects.toThrow("NEXT_REDIRECT");
@@ -127,7 +127,7 @@ describe("rejectUser", () => {
 
   it("rejects before touching the DB when the caller lacks admin role", async () => {
     vi.mocked(verifyRoleOrRedirect).mockRejectedValueOnce(
-      new Error("NEXT_REDIRECT"),
+      new Error("NEXT_REDIRECT")
     );
 
     await expect(rejectUser("user-42")).rejects.toThrow("NEXT_REDIRECT");

@@ -92,7 +92,7 @@ export async function createSession(): Promise<ActionResult<Session>> {
 
 export async function renameSession(
   sessionId: string,
-  title: string,
+  title: string
 ): Promise<ActionResult> {
   const userId = await requireUserId();
 
@@ -108,15 +108,18 @@ export async function renameSession(
         and(
           eq(sessions.id, sessionId),
           eq(sessions.ownerUserId, userId),
-          isNull(sessions.archivedAt),
-        ),
+          isNull(sessions.archivedAt)
+        )
       )
       .returning({ id: sessions.id });
 
     if (updated.length === 0) return { ok: false, error: "Session not found." };
   } catch (error) {
     if (isUniqueViolation(error)) {
-      return { ok: false, error: `You already have a session named "${trimmed}".` };
+      return {
+        ok: false,
+        error: `You already have a session named "${trimmed}".`,
+      };
     }
     throw error;
   }
@@ -139,13 +142,16 @@ export async function archiveSession(sessionId: string): Promise<ActionResult> {
 
   const archived = await db
     .update(sessions)
-    .set({ archivedAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+    .set({
+      archivedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    })
     .where(
       and(
         eq(sessions.id, sessionId),
         eq(sessions.ownerUserId, userId),
-        isNull(sessions.archivedAt),
-      ),
+        isNull(sessions.archivedAt)
+      )
     )
     .returning({ id: sessions.id });
 

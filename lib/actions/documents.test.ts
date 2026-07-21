@@ -5,9 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 vi.mock("@/lib/auth", () => ({
-  verifyRoleOrRedirect: vi
-    .fn()
-    .mockResolvedValue({ user: { id: "user-1" } }),
+  verifyRoleOrRedirect: vi.fn().mockResolvedValue({ user: { id: "user-1" } }),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -25,12 +23,12 @@ vi.mock("@/lib/storage", () => ({
   sourceDocxKey: vi
     .fn()
     .mockImplementation(
-      (sessionId: string, docId: string) => `${sessionId}/${docId}/source.docx`,
+      (sessionId: string, docId: string) => `${sessionId}/${docId}/source.docx`
     ),
   htmlOutputKey: vi
     .fn()
     .mockImplementation(
-      (sessionId: string, docId: string) => `${sessionId}/${docId}/output.html`,
+      (sessionId: string, docId: string) => `${sessionId}/${docId}/output.html`
     ),
 }));
 
@@ -72,15 +70,17 @@ function makeChain<T>(value: T) {
 }
 
 /** Raw row shape that the listDocuments query returns before mapping. */
-function makeDocRow(overrides: Partial<{
-  id: string;
-  name: string;
-  size: number;
-  uploadedAt: string;
-  jobId: string | null;
-  status: string | null;
-  errorMessage: string | null;
-}> = {}) {
+function makeDocRow(
+  overrides: Partial<{
+    id: string;
+    name: string;
+    size: number;
+    uploadedAt: string;
+    jobId: string | null;
+    status: string | null;
+    errorMessage: string | null;
+  }> = {}
+) {
   return {
     id: "doc-1",
     name: "slides.docx",
@@ -103,7 +103,7 @@ describe("listDocuments", () => {
 
   it("returns documents for a session with status mapped to ConversionStatus", async () => {
     vi.mocked(db.select).mockReturnValue(
-      makeChain([makeDocRow({ status: "completed" })]),
+      makeChain([makeDocRow({ status: "completed" })])
     );
 
     const result = await listDocuments("session-1");
@@ -120,7 +120,9 @@ describe("listDocuments", () => {
   });
 
   it("maps null job status (no conversion yet) to idle", async () => {
-    vi.mocked(db.select).mockReturnValue(makeChain([makeDocRow({ status: null })]));
+    vi.mocked(db.select).mockReturnValue(
+      makeChain([makeDocRow({ status: null })])
+    );
 
     const [doc] = await listDocuments("session-1");
 
@@ -129,7 +131,7 @@ describe("listDocuments", () => {
 
   it("maps failed status to error and forwards the error message", async () => {
     vi.mocked(db.select).mockReturnValue(
-      makeChain([makeDocRow({ status: "failed", errorMessage: "LiteLLM 500" })]),
+      makeChain([makeDocRow({ status: "failed", errorMessage: "LiteLLM 500" })])
     );
 
     const [doc] = await listDocuments("session-1");
@@ -140,7 +142,7 @@ describe("listDocuments", () => {
 
   it("maps needs_review to success (HTML is available)", async () => {
     vi.mocked(db.select).mockReturnValue(
-      makeChain([makeDocRow({ status: "needs_review" })]),
+      makeChain([makeDocRow({ status: "needs_review" })])
     );
 
     const [doc] = await listDocuments("session-1");
@@ -168,7 +170,7 @@ describe("listDocuments", () => {
 
   it("omits errorMessage when it is null", async () => {
     vi.mocked(db.select).mockReturnValue(
-      makeChain([makeDocRow({ errorMessage: null })]),
+      makeChain([makeDocRow({ errorMessage: null })])
     );
 
     const [doc] = await listDocuments("session-1");
@@ -186,7 +188,7 @@ describe("listDocuments", () => {
 
   it("propagates a redirect thrown by the auth check", async () => {
     vi.mocked(verifyRoleOrRedirect).mockRejectedValueOnce(
-      new Error("NEXT_REDIRECT"),
+      new Error("NEXT_REDIRECT")
     );
 
     await expect(listDocuments("session-1")).rejects.toThrow("NEXT_REDIRECT");
@@ -198,7 +200,7 @@ describe("getDocumentHtml", () => {
 
   it("downloads and returns HTML for a document the caller owns", async () => {
     vi.mocked(db.select).mockReturnValue(
-      makeChain([{ storageKey: "session-1/doc-1/output.html" }]),
+      makeChain([{ storageKey: "session-1/doc-1/output.html" }])
     );
     vi.mocked(downloadObject).mockResolvedValue(Buffer.from("<p>Hello</p>"));
 
@@ -219,7 +221,7 @@ describe("getDocumentHtml", () => {
 
   it("propagates errors thrown by the storage layer", async () => {
     vi.mocked(db.select).mockReturnValue(
-      makeChain([{ storageKey: "session-1/doc-1/output.html" }]),
+      makeChain([{ storageKey: "session-1/doc-1/output.html" }])
     );
     vi.mocked(downloadObject).mockRejectedValue(new Error("storage 503"));
 
@@ -232,7 +234,7 @@ describe("deleteDocument", () => {
 
   it("soft-deletes the document row and removes both blobs", async () => {
     vi.mocked(db.select).mockReturnValue(
-      makeChain([{ id: "doc-1", sessionId: "session-1" }]),
+      makeChain([{ id: "doc-1", sessionId: "session-1" }])
     );
     vi.mocked(db.update).mockReturnValue(makeChain(undefined));
     vi.mocked(removeObjects).mockResolvedValue(undefined);
@@ -249,7 +251,7 @@ describe("deleteDocument", () => {
   it("sets deletedAt on the soft-deleted row", async () => {
     const updateChain = makeChain(undefined);
     vi.mocked(db.select).mockReturnValue(
-      makeChain([{ id: "doc-1", sessionId: "session-1" }]),
+      makeChain([{ id: "doc-1", sessionId: "session-1" }])
     );
     vi.mocked(db.update).mockReturnValue(updateChain);
     vi.mocked(removeObjects).mockResolvedValue(undefined);
@@ -257,7 +259,7 @@ describe("deleteDocument", () => {
     await deleteDocument("doc-1");
 
     expect(updateChain.set).toHaveBeenCalledWith(
-      expect.objectContaining({ deletedAt: expect.any(String) }),
+      expect.objectContaining({ deletedAt: expect.any(String) })
     );
   });
 
@@ -271,7 +273,7 @@ describe("deleteDocument", () => {
 
   it("still resolves when storage cleanup throws after the row is tombstoned", async () => {
     vi.mocked(db.select).mockReturnValue(
-      makeChain([{ id: "doc-1", sessionId: "session-1" }]),
+      makeChain([{ id: "doc-1", sessionId: "session-1" }])
     );
     vi.mocked(db.update).mockReturnValue(makeChain(undefined));
     vi.mocked(removeObjects).mockRejectedValue(new Error("bucket unreachable"));

@@ -17,7 +17,9 @@ const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   redirect: vi.fn().mockImplementation((url: string) => {
     // next/navigation redirect() throws in the App Router; simulate that here.
-    throw Object.assign(new Error("NEXT_REDIRECT"), { digest: `NEXT_REDIRECT;${url}` });
+    throw Object.assign(new Error("NEXT_REDIRECT"), {
+      digest: `NEXT_REDIRECT;${url}`,
+    });
   }),
   nextResponseJson: vi
     .fn()
@@ -133,7 +135,9 @@ describe("Role-based access — verifyRoleOrRedirect", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.redirect.mockImplementation((url: string) => {
-      throw Object.assign(new Error("NEXT_REDIRECT"), { digest: `NEXT_REDIRECT;${url}` });
+      throw Object.assign(new Error("NEXT_REDIRECT"), {
+        digest: `NEXT_REDIRECT;${url}`,
+      });
     });
   });
 
@@ -156,7 +160,9 @@ describe("Role-based access — verifyRoleOrRedirect", () => {
   it("redirects to / when there is no active session (unauthenticated)", async () => {
     mocks.getSession.mockResolvedValue(null);
 
-    await expect(verifyRoleOrRedirect(["instructor"])).rejects.toThrow("NEXT_REDIRECT");
+    await expect(verifyRoleOrRedirect(["instructor"])).rejects.toThrow(
+      "NEXT_REDIRECT"
+    );
     expect(mocks.redirect).toHaveBeenCalledWith("/");
   });
 
@@ -164,7 +170,7 @@ describe("Role-based access — verifyRoleOrRedirect", () => {
     mocks.getSession.mockResolvedValue(makeSession("pending"));
 
     await expect(verifyRoleOrRedirect(["instructor", "admin"])).rejects.toThrow(
-      "NEXT_REDIRECT",
+      "NEXT_REDIRECT"
     );
     expect(mocks.redirect).toHaveBeenCalledWith("/unauthorized");
   });
@@ -172,14 +178,18 @@ describe("Role-based access — verifyRoleOrRedirect", () => {
   it("redirects to /unauthorized when an instructor tries to access an admin-only route", async () => {
     mocks.getSession.mockResolvedValue(makeSession("instructor"));
 
-    await expect(verifyRoleOrRedirect(["admin"])).rejects.toThrow("NEXT_REDIRECT");
+    await expect(verifyRoleOrRedirect(["admin"])).rejects.toThrow(
+      "NEXT_REDIRECT"
+    );
     expect(mocks.redirect).toHaveBeenCalledWith("/unauthorized");
   });
 
   it("redirects pending users away from instructor-only routes", async () => {
     mocks.getSession.mockResolvedValue(makeSession("pending"));
 
-    await expect(verifyRoleOrRedirect(["instructor"])).rejects.toThrow("NEXT_REDIRECT");
+    await expect(verifyRoleOrRedirect(["instructor"])).rejects.toThrow(
+      "NEXT_REDIRECT"
+    );
     expect(mocks.redirect).toHaveBeenCalledWith("/unauthorized");
   });
 });
@@ -206,7 +216,7 @@ describe("Role-based access — verifyRoleOrUnauthorized (API routes)", () => {
     expect("response" in result).toBe(true);
     expect(mocks.nextResponseJson).toHaveBeenCalledWith(
       { error: "Unauthorized" },
-      { status: 401 },
+      { status: 401 }
     );
   });
 
@@ -218,7 +228,7 @@ describe("Role-based access — verifyRoleOrUnauthorized (API routes)", () => {
     expect("response" in result).toBe(true);
     expect(mocks.nextResponseJson).toHaveBeenCalledWith(
       { error: "Unauthorized" },
-      { status: 401 },
+      { status: 401 }
     );
   });
 

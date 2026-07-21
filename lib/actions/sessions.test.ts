@@ -5,9 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 vi.mock("@/lib/auth", () => ({
-  verifyRoleOrRedirect: vi
-    .fn()
-    .mockResolvedValue({ user: { id: "user-1" } }),
+  verifyRoleOrRedirect: vi.fn().mockResolvedValue({ user: { id: "user-1" } }),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -112,7 +110,7 @@ describe("listSessions", () => {
 
   it("propagates a redirect thrown by the auth check", async () => {
     vi.mocked(verifyRoleOrRedirect).mockRejectedValueOnce(
-      new Error("NEXT_REDIRECT"),
+      new Error("NEXT_REDIRECT")
     );
 
     await expect(listSessions()).rejects.toThrow("NEXT_REDIRECT");
@@ -134,7 +132,7 @@ describe("listSessionsEnsuringDefault", () => {
   it("inserts a default session and returns it when the user has none", async () => {
     const insertChain = makeChain(undefined);
     vi.mocked(db.select)
-      .mockReturnValueOnce(makeChain([]))         // first check: no sessions
+      .mockReturnValueOnce(makeChain([])) // first check: no sessions
       .mockReturnValueOnce(makeChain([SESSION_1])); // after insert: default created
     vi.mocked(db.insert).mockReturnValue(insertChain);
 
@@ -199,7 +197,7 @@ describe("createSession", () => {
     vi.mocked(db.select).mockReturnValue(makeChain([]));
     const failChain = makeChain(undefined);
     (failChain.returning as ReturnType<typeof vi.fn>).mockRejectedValue(
-      uniqueViolation(),
+      uniqueViolation()
     );
     vi.mocked(db.insert).mockReturnValue(failChain);
 
@@ -216,7 +214,7 @@ describe("createSession", () => {
     vi.mocked(db.select).mockReturnValue(makeChain([]));
     const failChain = makeChain(undefined);
     (failChain.returning as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error("connection lost"),
+      new Error("connection lost")
     );
     vi.mocked(db.insert).mockReturnValue(failChain);
 
@@ -245,14 +243,17 @@ describe("renameSession", () => {
     await renameSession(SESSION_1.id, "  Trimmed  ");
 
     expect(updateChain.set).toHaveBeenCalledWith(
-      expect.objectContaining({ title: "Trimmed" }),
+      expect.objectContaining({ title: "Trimmed" })
     );
   });
 
   it("returns an error immediately when the trimmed title is blank", async () => {
     const result = await renameSession(SESSION_1.id, "   ");
 
-    expect(result).toEqual({ ok: false, error: "Session name cannot be empty." });
+    expect(result).toEqual({
+      ok: false,
+      error: "Session name cannot be empty.",
+    });
     expect(db.update).not.toHaveBeenCalled();
   });
 
@@ -267,7 +268,7 @@ describe("renameSession", () => {
   it("returns a friendly message when the new title duplicates an existing one", async () => {
     const updateChain = makeChain(undefined);
     (updateChain.returning as ReturnType<typeof vi.fn>).mockRejectedValue(
-      uniqueViolation(),
+      uniqueViolation()
     );
     vi.mocked(db.update).mockReturnValue(updateChain);
 
@@ -282,12 +283,12 @@ describe("renameSession", () => {
   it("re-throws unexpected DB errors", async () => {
     const updateChain = makeChain(undefined);
     (updateChain.returning as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error("db unreachable"),
+      new Error("db unreachable")
     );
     vi.mocked(db.update).mockReturnValue(updateChain);
 
     await expect(renameSession(SESSION_1.id, "Fine")).rejects.toThrow(
-      "db unreachable",
+      "db unreachable"
     );
   });
 });

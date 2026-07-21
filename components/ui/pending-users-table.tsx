@@ -110,7 +110,11 @@ export default function PendingUsersTable({
         </TableBody>
       </Table>
       {totalPages > 1 && (
-        <AdminTablePagination page={page} totalPages={totalPages} param="usersPage" />
+        <AdminTablePagination
+          page={page}
+          totalPages={totalPages}
+          param="usersPage"
+        />
       )}
     </div>
   );

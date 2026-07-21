@@ -40,7 +40,8 @@ export async function getUserRoleCounts(): Promise<UserRoleCounts> {
 
   const counts: UserRoleCounts = { pending: 0, instructor: 0, admin: 0 };
   for (const row of rows) {
-    if (row.role in counts) counts[row.role as keyof UserRoleCounts] = row.count;
+    if (row.role in counts)
+      counts[row.role as keyof UserRoleCounts] = row.count;
   }
   return counts;
 }
@@ -74,7 +75,9 @@ export async function getTokenUsage(days = 30): Promise<TokenUsage> {
       totalTokens: sql<number>`coalesce(sum(${modelCalls.promptTokens} + ${modelCalls.completionTokens}), 0)`,
     })
     .from(modelCalls)
-    .where(sql`${modelCalls.createdAt} >= now() - (${window} * interval '1 day')`);
+    .where(
+      sql`${modelCalls.createdAt} >= now() - (${window} * interval '1 day')`
+    );
 
   return { days: window, totalTokens: Number(row?.totalTokens ?? 0) };
 }
@@ -92,7 +95,9 @@ export async function getCostSummary(days = 30): Promise<CostSummary> {
   const [windowRow] = await db
     .select({ cost: sql<string | null>`sum(${modelCalls.costUsd})` })
     .from(modelCalls)
-    .where(sql`${modelCalls.createdAt} >= now() - (${window} * interval '1 day')`);
+    .where(
+      sql`${modelCalls.createdAt} >= now() - (${window} * interval '1 day')`
+    );
 
   const [allTimeRow] = await db
     .select({ cost: sql<string | null>`sum(${modelCalls.costUsd})` })
@@ -126,7 +131,7 @@ export interface RecentJobRow {
 
 export async function listRecentJobs(
   page = 1,
-  pageSize = DEFAULT_PAGE_SIZE,
+  pageSize = DEFAULT_PAGE_SIZE
 ): Promise<PagedResult<RecentJobRow>> {
   await requireAdmin();
   const safePage = Math.max(1, Math.floor(page));
@@ -156,7 +161,7 @@ export async function listRecentJobs(
       users.email,
       conversionJobs.status,
       conversionJobs.modelName,
-      conversionJobs.createdAt,
+      conversionJobs.createdAt
     )
     .orderBy(desc(conversionJobs.createdAt))
     .limit(pageSize)
@@ -183,7 +188,7 @@ export interface PendingUserRow {
 
 export async function listPendingUsersPage(
   page = 1,
-  pageSize = DEFAULT_PAGE_SIZE,
+  pageSize = DEFAULT_PAGE_SIZE
 ): Promise<PagedResult<PendingUserRow>> {
   await requireAdmin();
   const safePage = Math.max(1, Math.floor(page));

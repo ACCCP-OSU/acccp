@@ -27,7 +27,10 @@ interface SessionContextValue {
 
 const SessionContext = createContext<SessionContextValue | null>(null);
 
-function resolveSession(sessions: Session[], paramId: string | undefined): Session {
+function resolveSession(
+  sessions: Session[],
+  paramId: string | undefined
+): Session {
   return sessions.find((s) => s.id === paramId) ?? sessions[0];
 }
 
@@ -52,7 +55,7 @@ export function SessionProvider({
 
   const currentSession = useMemo(
     () => resolveSession(sessions, params.id),
-    [sessions, params.id],
+    [sessions, params.id]
   );
 
   const addSession = useCallback(async () => {
@@ -66,13 +69,13 @@ export function SessionProvider({
     (session: Session) => {
       router.push(`/dashboard/${session.id}`);
     },
-    [router],
+    [router]
   );
 
   const renameSession = useCallback(
     (sessionId: string, title: string): Promise<ActionResult> =>
       renameSessionAction(sessionId, title),
-    [],
+    []
   );
 
   const deleteSession = useCallback(
@@ -87,7 +90,7 @@ export function SessionProvider({
         if (next) router.push(`/dashboard/${next.id}`);
       }
     },
-    [sessions, currentSession.id, router],
+    [sessions, currentSession.id, router]
   );
 
   const value = useMemo(
@@ -106,7 +109,7 @@ export function SessionProvider({
       selectSession,
       renameSession,
       deleteSession,
-    ],
+    ]
   );
 
   return (

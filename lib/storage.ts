@@ -17,7 +17,8 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl) throw new Error("Missing env var: SUPABASE_URL");
-if (!serviceRoleKey) throw new Error("Missing env var: SUPABASE_SERVICE_ROLE_KEY");
+if (!serviceRoleKey)
+  throw new Error("Missing env var: SUPABASE_SERVICE_ROLE_KEY");
 
 export const DOCUMENTS_BUCKET = "documents";
 
@@ -40,25 +41,27 @@ export function htmlOutputKey(sessionId: string, documentId: string): string {
 export async function uploadObject(
   key: string,
   body: Buffer | string,
-  contentType: string,
+  contentType: string
 ): Promise<void> {
   const { error } = await storage.upload(key, body, {
     contentType,
     upsert: true, // Re-converting overwrites the previous output.
   });
-  if (error) throw new Error(`Storage upload failed for ${key}: ${error.message}`);
+  if (error)
+    throw new Error(`Storage upload failed for ${key}: ${error.message}`);
 }
 
 export async function downloadObject(key: string): Promise<Buffer> {
   const { data, error } = await storage.download(key);
-  if (error) throw new Error(`Storage download failed for ${key}: ${error.message}`);
+  if (error)
+    throw new Error(`Storage download failed for ${key}: ${error.message}`);
   return Buffer.from(await data.arrayBuffer());
 }
 
 /** The bucket is private, so downloads need a short-lived signed url. */
 export async function createSignedUrl(
   key: string,
-  expiresInSeconds = 60 * 5,
+  expiresInSeconds = 60 * 5
 ): Promise<string> {
   const { data, error } = await storage.createSignedUrl(key, expiresInSeconds);
   if (error) throw new Error(`Signing failed for ${key}: ${error.message}`);
